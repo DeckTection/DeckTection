@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, Dataset
 import torchvision.models as models
 from PIL import Image
 import numpy as np
-
+import random
 
 class SiameseNetwork(nn.Module):
     def __init__(self):
@@ -49,27 +49,39 @@ class ContrastiveLoss(nn.Module):
     
 
 class SiameseDataset(Dataset):
-    def __init__(self, image_paths, labels, transform=None):
-        self.image_paths = image_paths
-        self.labels = labels
+    def __init__(self, dataset, transform=None):
+        self.dataset = dataset
         self.transform = transform
 
     def __len__(self):
-        return len(self.image_paths)
+        return len(self.dataset)
 
     def __getitem__(self, index):
-        img1_path, img2_path = self.image_paths[index]
-        label = self.labels[index]
+        img1, label1 = self.dataset[index]
         
-        img1 = Image.open(img1_path).convert('RGB')
-        img2 = Image.open(img2_path).convert('RGB')
+        # Find a random image that is either of the same class (positive) or different class (negative)
+        same_class = random.choice([True, False])
 
+        if same_class:
+            # Select another image from the same class
+            idx = index
+            while self.dataset[idx][1] != label1:
+                idx = random.randint(0, len(self.dataset) - 1)
+            img2, label2 = self.dataset[idx]
+        else:
+            # Select a random image from a different class
+            idx = index
+            while self.dataset[idx][1] == label1:
+                idx = random.randint(0, len(self.dataset) - 1)
+            img2, label2 = self.dataset[idx]
+
+        # Apply transformations if any
         if self.transform:
             img1 = self.transform(img1)
             img2 = self.transform(img2)
 
-        return img1, img2, label
-    
+        return img1, img2, int(same_class)
+
 
 
 

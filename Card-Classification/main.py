@@ -4,6 +4,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, Dataset
 import torchvision.models as models
+from torchvision import datasets
 from PIL import Image
 import numpy as np
 from model.siamese_resnet import SiameseDataset, SiameseNetwork, ContrastiveLoss
@@ -12,20 +13,17 @@ from model.siamese_resnet import SiameseDataset, SiameseNetwork, ContrastiveLoss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define image transformation (resize, to tensor, normalize)
-transform = transforms.Compose([
-    transforms.Resize((100, 100)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
+# Define transformations
+transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-# Example data (just for illustration purposes)
-image_pairs = [("path_to_img1", "path_to_img2"), ("path_to_img3", "path_to_img4")]  # List of image pairs
-labels = [1, 0]  # Labels (1 = same class, 0 = different class)
+# Load the CIFAR-10 dataset
+dataset = datasets.CIFAR10(root='./data', train=True, download=True)
 
-# Create Dataset and DataLoader
-dataset = SiameseDataset(image_pairs, labels, transform)
-dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+# Create the Siamese dataset
+siamese_dataset = SiameseDataset(dataset, transform=transform)
+
+# Use DataLoader to load data in batches
+dataloader = DataLoader(siamese_dataset, batch_size=32, shuffle=True)
 
 # Instantiate model and optimizer
 model = SiameseNetwork().to(device)
