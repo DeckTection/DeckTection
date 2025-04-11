@@ -239,31 +239,43 @@ def generate_composite(composite_id, cards, backgrounds):
             x = random.randint(0, max_x)
             y = random.randint(0, max_y)
 
-            # Verify we got valid corners
-            if len(corners) != 4:
-                corners = [
-                    [x, y],
-                    [x + tw, y],
-                    [x + tw, y + th],
-                    [x, y + th]
-                ]
-            else:
-                # Adjust corners for final position
-                corners = [(x + px, y + py) for (px, py) in corners]
+            # Adjust corners for final position
+            final_corners = [(x + px, y + py) for (px, py) in corners]
             
             bg.paste(transformed, (x, y), transformed)
-            annotations.append(corners)
+            annotations.append(final_corners)
 
             # Create precise mask
             mask = Image.new("L", (IMAGE_SIZE, IMAGE_SIZE), 0)
             draw = ImageDraw.Draw(mask)
-            draw.polygon(corners, fill=255)
+            draw.polygon(final_corners, fill=255)
             masks.append(mask)
 
         except Exception as e:
             print(f"Error processing card: {e}")
 
-    # Rest of the function remains the same...
+    # Save YOLO format with polygon coordinates
+    if annotations:
+        yolo_img_path = f"{OUTPUT_DIR}/yolo/images/train/{composite_id}.jpg"
+        bg.save(yolo_img_path)
+
+        with open(f"{OUTPUT_DIR}/yolo/labels/train/{composite_id}.txt", "w") as f:
+            for corners in annotations:
+                # Normalize coordinates
+                normalized = [(x/IMAGE_SIZE, y/IMAGE_SIZE) for (x, y) in corners]
+                # Convert to YOLO polygon format
+                points = " ".join([f"{x:.6f} {y:.6f}" for x, y in normalized])
+                f.write(f"0 {points}\n")
+
+    # Save SAM format masks
+    if masks:
+        sam_img_path = f"{OUTPUT_DIR}/sam/images/train/{composite_id}.jpg"
+        bg.save(sam_img_path)
+        
+        combined_mask = Image.new("L", (IMAGE_SIZE, IMAGE_SIZE), 0)
+        for mask in masks:
+            combined_mask = ImageChops.lighter(combined_mask, mask)
+        combined_mask.save(f"{OUTPUT_DIR}/sam/masks/train/{composite_id}.png")
 
 def load_backgrounds():
     """Load and preprocess all background images"""
