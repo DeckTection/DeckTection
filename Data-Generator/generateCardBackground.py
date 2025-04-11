@@ -3,13 +3,13 @@ import random
 import csv
 import requests
 import glob
-import math
 from PIL import Image, ImageDraw, ImageChops
 from io import BytesIO
 from tqdm import tqdm
 import numpy as np
 from bs4 import BeautifulSoup
 import base64
+import cv2 
 
 # Configuration
 NUM_COMPOSITES = 1000  # Number of composite images to generate
@@ -61,74 +61,114 @@ def load_cards(csv_path):
             })
     return cards
 
-def process_card_image(card_image):
-    """Enhanced transformations with edge protection and aggressive rotations"""
-    # More aggressive rotation logic
-    if random.random() < 0.25:  # 25% chance for dramatic rotation
-        angle = random.choice([-90, 90, -75, 75, -60, 60])
-    else:
-        angle = random.uniform(-45, 45)
+def process_card_image(card_image, return_corners=False):
+    """Enhanced transformations with corner tracking"""
+    original_width, original_height = card_image.size
+    
+    # Track original corners (top-left, top-right, bottom-right, bottom-left)
+    orig_corners = np.array([
+        [0, 0],
+        [original_width, 0],
+        [original_width, original_height],
+        [0, original_height]
+    ], dtype=np.float32).reshape(-1, 1, 2)  # Reshape for OpenCV compatibility
+    
+    # Apply rotation
+    angle = random.uniform(-45, 45)
     rotated = card_image.rotate(angle, expand=True, resample=Image.BICUBIC)
     
-    # Resize with aspect ratio preservation
-    original_aspect = rotated.width / rotated.height
+    # Calculate rotation matrix and transform corners
+    rotation_matrix = cv2.getRotationMatrix2D(
+        (original_width/2, original_height/2), angle, 1)
+    rotated_corners = cv2.transform(
+        orig_corners, rotation_matrix).squeeze()
+    
+    # Calculate new bounding box after rotation
+    rotated_width = rotated.width
+    rotated_height = rotated.height
+    
+    # Apply resizing
     new_width = random.randint(100, 300)
-    new_height = int(new_width / original_aspect)
+    scale_factor = new_width / rotated_width
+    new_height = int(rotated_height * scale_factor)
     resized = rotated.resize((new_width, new_height), Image.LANCZOS)
     
-    # Create buffer space for perspective transforms
-    buffer_multiplier = 1.5  # Extra space to prevent clipping
+    # Scale corners
+    scaled_corners = rotated_corners * scale_factor
+    
+    # Apply perspective transform
+    buffer_multiplier = 1.5
     buffered_w = int(new_width * buffer_multiplier)
     buffered_h = int(new_height * buffer_multiplier)
-    buffered = Image.new("RGBA", (buffered_w, buffered_h))
-    paste_x = (buffered_w - new_width) // 2
-    paste_y = (buffered_h - new_height) // 2
-    buffered.paste(resized, (paste_x, paste_y))
     
-    # Aggressive perspective parameters
-    max_shift = 0.25  # Increased perspective distortion
-    pa = [
-        (paste_x, paste_y),
-        (paste_x + new_width, paste_y),
-        (paste_x + new_width, paste_y + new_height),
-        (paste_x, paste_y + new_height)
+    # Create perspective transform points (ensure proper shape)
+    src_points = np.array([
+        [buffered_w/2 - new_width/2, buffered_h/2 - new_height/2],
+        [buffered_w/2 + new_width/2, buffered_h/2 - new_height/2],
+        [buffered_w/2 + new_width/2, buffered_h/2 + new_height/2],
+        [buffered_w/2 - new_width/2, buffered_h/2 + new_height/2]
+    ], dtype=np.float32).reshape(-1, 1, 2)  # Reshape for OpenCV
+    
+    max_shift = 0.25
+    dst_points = src_points + np.random.uniform(
+        -new_width*max_shift, new_width*max_shift, size=(4, 1, 2))
+    
+    # Ensure we have exactly 4 points
+    if len(src_points) != 4 or len(dst_points) != 4:
+        if return_corners:
+            return resized, [[0, 0], [new_width, 0], [new_width, new_height], [0, new_height]]
+        return resized
+    
+    # Calculate perspective matrix
+    perspective_matrix = cv2.getPerspectiveTransform(
+        src_points.astype(np.float32), 
+        dst_points.astype(np.float32))
+    
+    # Transform scaled corners through perspective
+    perspective_corners = cv2.perspectiveTransform(
+        scaled_corners.reshape(1, -1, 2), perspective_matrix).squeeze()
+    
+    # Transform to final image coordinates
+    final_corners = perspective_corners + [
+        buffered_w/2 - new_width/2,
+        buffered_h/2 - new_height/2
     ]
-    pb = [
-        (paste_x + random.randint(-int(new_width*max_shift), int(new_width*max_shift)),
-        paste_y + random.randint(-int(new_height*max_shift), int(new_height*max_shift))),
-        (paste_x + new_width + random.randint(-int(new_width*max_shift), int(new_width*max_shift)),
-        paste_y + random.randint(-int(new_height*max_shift), int(new_height*max_shift))),
-        (paste_x + new_width + random.randint(-int(new_width*max_shift), int(new_width*max_shift)),
-        paste_y + new_height + random.randint(-int(new_height*max_shift), int(new_height*max_shift))),
-        (paste_x + random.randint(-int(new_width*max_shift), int(new_width*max_shift)),
-        paste_y + new_height + random.randint(-int(new_height*max_shift), int(new_height*max_shift)))
-    ]
     
-    coeffs = find_coeffs(pa, pb)
-    
+    # Apply the perspective transform to the image
     try:
-        transformed = buffered.transform(
-            buffered.size, Image.Transform.PERSPECTIVE, coeffs, 
-            resample=Image.BICUBIC)
+        transformed = Image.new("RGBA", (buffered_w, buffered_h))
+        warped = resized.transform(
+            (buffered_w, buffered_h),
+            Image.Transform.PERSPECTIVE,
+            perspective_matrix.flatten()[:8],  # PIL wants 8 values
+            resample=Image.BICUBIC
+        )
+        transformed.paste(warped, (0, 0))
     except Exception:
-        transformed = buffered
+        transformed = resized
     
-    # Auto-crop to visible content with margin
+    # Auto-crop and calculate final corners
     bbox = transformed.getbbox()
     if bbox:
-        margin = 10  # Safety margin
-        crop_box = (
-            max(0, bbox[0] - margin),
-            max(0, bbox[1] - margin),
-            min(transformed.width, bbox[2] + margin),
-            min(transformed.height, bbox[3] + margin)
-        )
-        final = transformed.crop(crop_box)
+        crop_x1, crop_y1, crop_x2, crop_y2 = bbox
+        transformed = transformed.crop(bbox)
+        # Adjust corners for cropping
+        final_corners -= [crop_x1, crop_y1]
     else:
-        final = transformed
+        crop_x1 = crop_y1 = 0
     
     # Resize to original target dimensions
-    return final.resize((new_width, new_height), Image.LANCZOS)
+    final_width, final_height = new_width, new_height
+    transformed = transformed.resize((final_width, final_height), Image.LANCZOS)
+    
+    # Scale corners to final image size
+    scale_x = final_width / (crop_x2 - crop_x1) if bbox else 1
+    scale_y = final_height / (crop_y2 - crop_y1) if bbox else 1
+    final_corners *= [scale_x, scale_y]
+    
+    if return_corners:
+        return transformed, final_corners.astype(int).tolist()
+    return transformed
 
 def download_image(url):
     """Download image from URL and return as PIL Image or None"""
@@ -182,14 +222,13 @@ def generate_composite(composite_id, cards, backgrounds):
     for card in selected_cards:
         img = download_image(card['image_url'])
         if img is None:
-            print(f"Pulled image from Google for {card['product_name']}")
             img = fetch_google_image(card['product_name'])
         if not img:
             continue
 
         try:
             img = img.convert("RGBA")
-            transformed = process_card_image(img)
+            transformed, corners = process_card_image(img, return_corners=True)
             tw, th = transformed.size
 
             max_x = IMAGE_SIZE - tw
@@ -200,21 +239,31 @@ def generate_composite(composite_id, cards, backgrounds):
             x = random.randint(0, max_x)
             y = random.randint(0, max_y)
 
+            # Verify we got valid corners
+            if len(corners) != 4:
+                corners = [
+                    [x, y],
+                    [x + tw, y],
+                    [x + tw, y + th],
+                    [x, y + th]
+                ]
+            else:
+                # Adjust corners for final position
+                corners = [(x + px, y + py) for (px, py) in corners]
+            
             bg.paste(transformed, (x, y), transformed)
-            annotations.append({'x': x, 'y': y, 'w': tw, 'h': th})
+            annotations.append(corners)
 
-            # Create exact segmentation mask using alpha channel
-            card_mask = Image.new("L", (IMAGE_SIZE, IMAGE_SIZE), 0)
-            alpha = transformed.getchannel('A')
-            
-            # Threshold alpha to create binary mask (optional)
-            alpha = alpha.point(lambda p: 255 if p > 0 else 0)
-            
-            card_mask.paste(alpha, (x, y), alpha)
-            masks.append(card_mask)
+            # Create precise mask
+            mask = Image.new("L", (IMAGE_SIZE, IMAGE_SIZE), 0)
+            draw = ImageDraw.Draw(mask)
+            draw.polygon(corners, fill=255)
+            masks.append(mask)
 
         except Exception as e:
             print(f"Error processing card: {e}")
+
+    # Rest of the function remains the same...
 
 def load_backgrounds():
     """Load and preprocess all background images"""
