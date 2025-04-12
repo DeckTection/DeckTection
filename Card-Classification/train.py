@@ -23,7 +23,7 @@ small_dataset = Subset(dataset, range(500))
 siamese_dataset = SiameseDataset(dataset, transform=transform)
 
 # Use DataLoader to load data in batches
-dataloader = DataLoader(siamese_dataset, batch_size=32, shuffle=True)
+dataloader = DataLoader(siamese_dataset, batch_size=128, shuffle=True)
 
 # Instantiate model and optimizer
 model = SiameseNetwork().to(device)
@@ -31,7 +31,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 loss_fn = ContrastiveLoss()
 
 
-num_epochs = 10
+num_epochs = 100
 import math
 for epoch in range(num_epochs):
     model.train()  # Set model to training mode
@@ -69,7 +69,7 @@ embedding_list = []
 label_list = []
 
 with torch.no_grad():
-    for img, label in DataLoader(dataset, batch_size=32):  # use the same transform
+    for img, label in DataLoader(dataset, batch_size=128):  # use the same transform
         img = img.to(device)
         embeddings = model.forward_one(img)  # assuming this returns the 1D feature vector
         embedding_list.append(embeddings.cpu())
