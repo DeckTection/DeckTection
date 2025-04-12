@@ -3,7 +3,7 @@ import random
 import csv
 import requests
 import glob
-from PIL import Image, ImageDraw, ImageChops
+from PIL import Image
 from io import BytesIO
 from tqdm import tqdm
 import numpy as np
@@ -12,7 +12,7 @@ import base64
 import cv2 
 
 # Configuration
-NUM_COMPOSITES = 1000  # Number of composite images to generate
+NUM_COMPOSITES = 1000
 IMAGE_SIZE = 640
 OUTPUT_DIR = "datasets"
 BACKGROUNDS_DIR = "backgrounds"
@@ -22,32 +22,13 @@ MAX_CARDS = 5
 # Create directories
 os.makedirs(f"{OUTPUT_DIR}/yolo/images/train", exist_ok=True)
 os.makedirs(f"{OUTPUT_DIR}/yolo/labels/train", exist_ok=True)
-os.makedirs(f"{OUTPUT_DIR}/sam/images/train", exist_ok=True)
-os.makedirs(f"{OUTPUT_DIR}/sam/masks/train", exist_ok=True)
 
 # Load background images
 background_paths = glob.glob(f"{BACKGROUNDS_DIR}/*.jpg") + \
                    glob.glob(f"{BACKGROUNDS_DIR}/*.png") + \
                    glob.glob(f"{BACKGROUNDS_DIR}/*.jpeg")
 
-def find_coeffs(pa, pb):
-    """Calculate perspective transform coefficients with stability fixes"""
-    matrix = []
-    for (x, y), (u, v) in zip(pa, pb):
-        matrix.append([x, y, 1, 0, 0, 0, -u*x, -u*y])
-        matrix.append([0, 0, 0, x, y, 1, -v*x, -v*y])
-    
-    A = np.array(matrix, dtype=np.float64)
-    B = np.array(pb).flatten().astype(np.float64)
-    
-    try:
-        coeffs = np.linalg.lstsq(A, B, rcond=1e-6)[0]
-        return coeffs.tolist()
-    except np.linalg.LinAlgError:
-        return [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
-
 def load_cards(csv_path):
-    """Load card data from CSV file"""
     cards = []
     with open(csv_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
@@ -61,117 +42,88 @@ def load_cards(csv_path):
             })
     return cards
 
-def process_card_image(card_image, return_corners=False):
-    """Enhanced transformations with corner tracking"""
+def process_card_image(card_image):
     original_width, original_height = card_image.size
     
-    # Track original corners (top-left, top-right, bottom-right, bottom-left)
-    orig_corners = np.array([
-        [0, 0],
-        [original_width, 0],
-        [original_width, original_height],
-        [0, original_height]
-    ], dtype=np.float32).reshape(-1, 1, 2)  # Reshape for OpenCV compatibility
-    
     # Apply rotation
-    angle = random.uniform(-45, 45)
+    angle = random.uniform(-179, 179)
     rotated = card_image.rotate(angle, expand=True, resample=Image.BICUBIC)
-    
-    # Calculate rotation matrix and transform corners
-    rotation_matrix = cv2.getRotationMatrix2D(
-        (original_width/2, original_height/2), angle, 1)
-    rotated_corners = cv2.transform(
-        orig_corners, rotation_matrix).squeeze()
-    
-    # Calculate new bounding box after rotation
-    rotated_width = rotated.width
-    rotated_height = rotated.height
     
     # Apply resizing
     new_width = random.randint(100, 300)
-    scale_factor = new_width / rotated_width
-    new_height = int(rotated_height * scale_factor)
+    scale_factor = new_width / rotated.width
+    new_height = int(rotated.height * scale_factor)
     resized = rotated.resize((new_width, new_height), Image.LANCZOS)
     
-    # Scale corners
-    scaled_corners = rotated_corners * scale_factor
+    # Create a larger canvas to contain the transformed card without cropping
+    padding = int(max(new_width, new_height) * 0.3)  # Extra space for transformation
+    canvas_size = (new_width + padding*2, new_height + padding*2)
+    canvas = Image.new('RGBA', canvas_size, (0, 0, 0, 0))
+    canvas.paste(resized, (padding, padding))
     
     # Apply perspective transform
-    buffer_multiplier = 1.5
-    buffered_w = int(new_width * buffer_multiplier)
-    buffered_h = int(new_height * buffer_multiplier)
-    
-    # Create perspective transform points (ensure proper shape)
     src_points = np.array([
-        [buffered_w/2 - new_width/2, buffered_h/2 - new_height/2],
-        [buffered_w/2 + new_width/2, buffered_h/2 - new_height/2],
-        [buffered_w/2 + new_width/2, buffered_h/2 + new_height/2],
-        [buffered_w/2 - new_width/2, buffered_h/2 + new_height/2]
-    ], dtype=np.float32).reshape(-1, 1, 2)  # Reshape for OpenCV
-    
-    max_shift = 0.25
-    dst_points = src_points + np.random.uniform(
-        -new_width*max_shift, new_width*max_shift, size=(4, 1, 2))
-    
-    # Ensure we have exactly 4 points
-    if len(src_points) != 4 or len(dst_points) != 4:
-        if return_corners:
-            return resized, [[0, 0], [new_width, 0], [new_width, new_height], [0, new_height]]
-        return resized
-    
-    # Calculate perspective matrix
-    perspective_matrix = cv2.getPerspectiveTransform(
-        src_points.astype(np.float32), 
-        dst_points.astype(np.float32))
-    
-    # Transform scaled corners through perspective
-    perspective_corners = cv2.perspectiveTransform(
-        scaled_corners.reshape(1, -1, 2), perspective_matrix).squeeze()
-    
-    # Transform to final image coordinates
-    final_corners = perspective_corners + [
-        buffered_w/2 - new_width/2,
-        buffered_h/2 - new_height/2
-    ]
-    
-    # Apply the perspective transform to the image
+        [padding, padding],
+        [padding + new_width, padding],
+        [padding + new_width, padding + new_height],
+        [padding, padding + new_height]
+    ], dtype=np.float32)
+
+    perspective_mode = random.choice(['axis_rotation', 'random_warp', 'combined'])
+    max_shift = 0.2
+
+    if perspective_mode == 'axis_rotation':
+        tilt_type = random.choice(['horizontal', 'vertical'])
+        base_shift = random.uniform(0.1, 0.25)
+        noise_scale = random.uniform(0.05, 0.15)
+
+        if tilt_type == 'horizontal':
+            dst_points = np.array([
+                [padding + new_width*base_shift, padding - new_height*noise_scale],
+                [padding + new_width*(1-base_shift), padding - new_height*noise_scale],
+                [padding + new_width*(1+base_shift*0.5), padding + new_height*(1+noise_scale)],
+                [padding - new_width*base_shift*0.5, padding + new_height*(1+noise_scale)]
+            ], dtype=np.float32)
+        else:
+            dst_points = np.array([
+                [padding - new_width*noise_scale, padding + new_height*base_shift],
+                [padding + new_width*(1+noise_scale), padding + new_height*base_shift],
+                [padding + new_width*(1+noise_scale*0.5), padding + new_height*(1-base_shift)],
+                [padding - new_width*noise_scale*0.5, padding + new_height*(1-base_shift)]
+            ], dtype=np.float32)
+
+    elif perspective_mode == 'random_warp':
+        dst_points = src_points + np.random.uniform(
+            -new_width*max_shift, new_width*max_shift, size=(4, 2))
+    else:
+        base_shift = random.uniform(0.1, 0.2)
+        dst_points = np.array([
+            [padding + base_shift*new_width, padding - base_shift*new_height],
+            [padding + new_width*(1-base_shift), padding - base_shift*new_height],
+            [padding + new_width*(1+base_shift), padding + new_height*(1+base_shift)],
+            [padding - base_shift*new_width, padding + new_height*(1+base_shift)]
+        ], dtype=np.float32)
+        dst_points += np.random.uniform(-new_width*0.1, new_width*0.1, size=(4, 2))
+
     try:
-        transformed = Image.new("RGBA", (buffered_w, buffered_h))
-        warped = resized.transform(
-            (buffered_w, buffered_h),
+        matrix = cv2.getPerspectiveTransform(src_points, dst_points)
+        transformed = canvas.transform(
+            canvas_size,
             Image.Transform.PERSPECTIVE,
-            perspective_matrix.flatten()[:8],  # PIL wants 8 values
+            matrix.flatten()[:8],
             resample=Image.BICUBIC
         )
-        transformed.paste(warped, (0, 0))
     except Exception:
-        transformed = resized
+        transformed = canvas
     
-    # Auto-crop and calculate final corners
+    # Get bounding box of non-transparent pixels
     bbox = transformed.getbbox()
     if bbox:
-        crop_x1, crop_y1, crop_x2, crop_y2 = bbox
         transformed = transformed.crop(bbox)
-        # Adjust corners for cropping
-        final_corners -= [crop_x1, crop_y1]
-    else:
-        crop_x1 = crop_y1 = 0
     
-    # Resize to original target dimensions
-    final_width, final_height = new_width, new_height
-    transformed = transformed.resize((final_width, final_height), Image.LANCZOS)
-    
-    # Scale corners to final image size
-    scale_x = final_width / (crop_x2 - crop_x1) if bbox else 1
-    scale_y = final_height / (crop_y2 - crop_y1) if bbox else 1
-    final_corners *= [scale_x, scale_y]
-    
-    if return_corners:
-        return transformed, final_corners.astype(int).tolist()
     return transformed
 
 def download_image(url):
-    """Download image from URL and return as PIL Image or None"""
     try:
         if url.startswith("data:image"):
             header, data = url.split(",", 1)
@@ -186,7 +138,6 @@ def download_image(url):
     return None
 
 def fetch_google_image(product_name):
-    """Improved Google Images search with better result parsing"""
     try:
         query = f"{product_name} site:scryfall.com"
         search_url = "https://www.google.com/search"
@@ -211,87 +162,81 @@ def fetch_google_image(product_name):
     return None
 
 def generate_composite(composite_id, cards, backgrounds):
-    """Generate one composite image with multiple cards"""
-    bg = random.choice(backgrounds).copy()
+    bg = random.choice(backgrounds).copy().resize((IMAGE_SIZE, IMAGE_SIZE))
     annotations = []
-    masks = []
-
     num_cards = random.randint(MIN_CARDS, MAX_CARDS)
     selected_cards = random.sample(cards, num_cards)
 
     for card in selected_cards:
-        img = download_image(card['image_url'])
-        if img is None:
-            img = fetch_google_image(card['product_name'])
+        img = download_image(card['image_url']) or fetch_google_image(card['product_name'])
         if not img:
             continue
 
         try:
             img = img.convert("RGBA")
-            transformed, corners = process_card_image(img, return_corners=True)
+            transformed = process_card_image(img)
+            if not transformed:
+                continue
+                
             tw, th = transformed.size
-
+            
+            # Calculate maximum allowed position to keep full card visible
             max_x = IMAGE_SIZE - tw
             max_y = IMAGE_SIZE - th
             if max_x < 0 or max_y < 0:
-                continue
-
+                continue  # Skip if card is larger than image
+            
             x = random.randint(0, max_x)
             y = random.randint(0, max_y)
-
-            # Adjust corners for final position
-            final_corners = [(x + px, y + py) for (px, py) in corners]
             
+            # Create axis-aligned bounding box
+            bbox = (x, y, x + tw, y + th)
+            
+            # Paste card onto background
             bg.paste(transformed, (x, y), transformed)
-            annotations.append(final_corners)
-
-            # Create precise mask
-            mask = Image.new("L", (IMAGE_SIZE, IMAGE_SIZE), 0)
-            draw = ImageDraw.Draw(mask)
-            draw.polygon(final_corners, fill=255)
-            masks.append(mask)
+            annotations.append(bbox)
 
         except Exception as e:
             print(f"Error processing card: {e}")
 
-    # Save YOLO format with polygon coordinates
     if annotations:
-        yolo_img_path = f"{OUTPUT_DIR}/yolo/images/train/{composite_id}.jpg"
-        bg.save(yolo_img_path)
-
-        with open(f"{OUTPUT_DIR}/yolo/labels/train/{composite_id}.txt", "w") as f:
-            for corners in annotations:
-                # Normalize coordinates
-                normalized = [(x/IMAGE_SIZE, y/IMAGE_SIZE) for (x, y) in corners]
-                # Convert to YOLO polygon format
-                points = " ".join([f"{x:.6f} {y:.6f}" for x, y in normalized])
-                f.write(f"0 {points}\n")
-
-    # Save SAM format masks
-    if masks:
-        sam_img_path = f"{OUTPUT_DIR}/sam/images/train/{composite_id}.jpg"
-        bg.save(sam_img_path)
+        # Save image
+        bg.convert('RGB').save(f"{OUTPUT_DIR}/yolo/images/train/{composite_id}.jpg")
         
-        combined_mask = Image.new("L", (IMAGE_SIZE, IMAGE_SIZE), 0)
-        for mask in masks:
-            combined_mask = ImageChops.lighter(combined_mask, mask)
-        combined_mask.save(f"{OUTPUT_DIR}/sam/masks/train/{composite_id}.png")
+        # Save YOLO annotations
+        with open(f"{OUTPUT_DIR}/yolo/labels/train/{composite_id}.txt", "w") as f:
+            for x_min, y_min, x_max, y_max in annotations:
+                # Calculate normalized center coordinates and dimensions
+                width = x_max - x_min
+                height = y_max - y_min
+                cx = (x_min + x_max) / 2 / IMAGE_SIZE
+                cy = (y_min + y_max) / 2 / IMAGE_SIZE
+                w = width / IMAGE_SIZE
+                h = height / IMAGE_SIZE
+                
+                # Ensure values are within valid range [0, 1]
+                cx = max(0.0, min(cx, 1.0))
+                cy = max(0.0, min(cy, 1.0))
+                w = max(0.0, min(w, 1.0))
+                h = max(0.0, min(h, 1.0))
+                
+                # Skip boxes that are too small
+                if w * h < (100 / (IMAGE_SIZE**2)):
+                    continue
+                
+                f.write(f"0 {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n")
 
 def load_backgrounds():
-    """Load and preprocess all background images"""
     backgrounds = []
     for bg_path in background_paths:
         try:
-            bg = Image.open(bg_path).convert('RGB')
-            if bg.size != (IMAGE_SIZE, IMAGE_SIZE):
-                bg = bg.resize((IMAGE_SIZE, IMAGE_SIZE))
+            bg = Image.open(bg_path).convert('RGB').resize((IMAGE_SIZE, IMAGE_SIZE))
             backgrounds.append(bg)
         except Exception as e:
             print(f"Skipping invalid background: {bg_path}")
     return backgrounds
 
 def create_dataset(csv_path):
-    """Main dataset creation function"""
     cards = load_cards(csv_path)
     backgrounds = load_backgrounds()
     

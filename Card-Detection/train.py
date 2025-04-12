@@ -6,12 +6,12 @@ def train_yolov12():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
     # Load model - use proper YOLOv12 implementation
-    model = YOLO('yolov12l.pt').to(device)  # Ensure this model file exists
+    model = YOLO('yolo12l.pt').to(device)  # Ensure this model file exists
     
     # Train with augmentation
     results = model.train(
-        data='dataset/data.yaml',
-        epochs=300,
+        data=r"C:\Users\willi\Documents\datasets\CardDataset\data.yaml",
+        epochs=5,
         batch=-1,  # Automatic batch size
         imgsz=640,
         device=device,
@@ -24,7 +24,7 @@ def train_yolov12():
         mosaic=1.0,
         mixup=0.2,
         patience=30,
-        rect=False  # Disable rectangular training for card detection
+        rect=False,  # Disable rectangular training for card detection
         single_cls=True,  # Treat as single-class dataset
         overlap_mask=False
     )

@@ -8,7 +8,7 @@ def run_inference():
     
     # Run inference
     results = model.predict(
-        source='your_input_video.mp4',
+        source= r'C:\Users\willi\Documents\GitHub\DeckTection\Card-Detection\Opening Magic the Gathering_ The Dark vintage booster pack.mp4',
         conf=0.35,
         iou=0.5,
         device='cuda' if torch.cuda.is_available() else 'cpu',
