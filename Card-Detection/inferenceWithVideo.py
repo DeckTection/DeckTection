@@ -4,11 +4,11 @@ import torch
 
 def run_inference():
     # Load trained model
-    model = YOLO('runs/detect/train/weights/best.pt')  # Update path
+    model = YOLO('runs/detect/train2/weights/best.pt')  # Update path
     
     # Run inference
     results = model.predict(
-        source= r'C:\Users\willi\Documents\GitHub\DeckTection\Card-Detection\Opening Magic the Gathering_ The Dark vintage booster pack.mp4',
+        source= r'C:\Users\willi\Documents\GitHub\DeckTection\Card-Detection\Streamer pulls Rainbow Pikachu on a pack he got paid to bend. $200 card.mp4',
         conf=0.35,
         iou=0.5,
         device='cuda' if torch.cuda.is_available() else 'cpu',

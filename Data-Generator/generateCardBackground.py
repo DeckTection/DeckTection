@@ -185,12 +185,42 @@ def generate_composite(composite_id, cards, backgrounds):
             max_y = IMAGE_SIZE - th
             if max_x < 0 or max_y < 0:
                 continue  # Skip if card is larger than image
-            
-            x = random.randint(0, max_x)
-            y = random.randint(0, max_y)
+
+            # Try to find non-overlapping position
+            max_attempts = 10
+            placed = False
+            for _ in range(max_attempts):
+                x = random.randint(0, max_x)
+                y = random.randint(0, max_y)
+                new_bbox = (x, y, x + tw, y + th)
+                
+                # Check for complete overlap with existing cards
+                complete_overlap = False
+                for existing_bbox in annotations:
+                    # Check if new is completely inside existing
+                    inside_existing = (new_bbox[0] >= existing_bbox[0] and
+                                      new_bbox[1] >= existing_bbox[1] and
+                                      new_bbox[2] <= existing_bbox[2] and
+                                      new_bbox[3] <= existing_bbox[3])
+                    # Check if existing is completely inside new
+                    existing_inside_new = (existing_bbox[0] >= new_bbox[0] and
+                                          existing_bbox[1] >= new_bbox[1] and
+                                          existing_bbox[2] <= new_bbox[2] and
+                                          existing_bbox[3] <= new_bbox[3])
+                    
+                    if inside_existing or existing_inside_new:
+                        complete_overlap = True
+                        break
+                
+                if not complete_overlap:
+                    placed = True
+                    break
+
+            if not placed:
+                continue  # Skip this card after max attempts
             
             # Create axis-aligned bounding box
-            bbox = (x, y, x + tw, y + th)
+            bbox = new_bbox
             
             # Paste card onto background
             bg.paste(transformed, (x, y), transformed)
