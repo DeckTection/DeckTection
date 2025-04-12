@@ -7,8 +7,6 @@ import torchvision.models as models
 from PIL import Image
 import numpy as np
 import random
-import torch.nn.functional as F
-
 
 class SiameseNetwork(nn.Module):
     def __init__(self):
@@ -44,13 +42,9 @@ class ContrastiveLoss(nn.Module):
         self.margin = margin
     
     def forward(self, output1, output2, label):
-        # euclidean_distance = torch.sqrt(torch.sum((output1 - output2) ** 2, dim=1) + 1e-9)
-        # loss = torch.mean((1 - label) * torch.pow(euclidean_distance, 2) + 
-        #                   (label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
-        dist = F.pairwise_distance(output1, output2, p=2)
-        term1 = (label) * (torch.pow(dist,2)) 
-        term2 = (1 - label) * (torch.pow(torch.clamp(self.margin - dist, min = 0.0), 2))
-        loss = torch.mean(term1 + term2)
+        euclidean_distance = torch.sqrt(torch.sum((output1 - output2) ** 2, dim=1) + 1e-9)
+        loss = torch.mean((1 - label) * torch.pow(euclidean_distance, 2) + 
+                          (label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
         return loss
     
 
