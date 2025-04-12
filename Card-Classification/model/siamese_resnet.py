@@ -42,7 +42,7 @@ class ContrastiveLoss(nn.Module):
         self.margin = margin
     
     def forward(self, output1, output2, label):
-        euclidean_distance = torch.sqrt(torch.sum((output1 - output2) ** 2, dim=1))
+        euclidean_distance = torch.sqrt(torch.sum((output1 - output2) ** 2, dim=1) + 1e-9)
         loss = torch.mean((1 - label) * torch.pow(euclidean_distance, 2) + 
                           (label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
         return loss

@@ -2,13 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, Subset
 import torchvision.models as models
 from torchvision import datasets
 from PIL import Image
 import numpy as np
 from model.siamese_resnet import SiameseDataset, SiameseNetwork, ContrastiveLoss
-
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -19,7 +18,8 @@ transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5
 # Load the CIFAR-10 dataset
 dataset = datasets.CIFAR10(root='./data', train=True, download=True)
 
-# Create the Siamese dataset
+# Take just the first 500 samples
+small_dataset = Subset(dataset, range(500))
 siamese_dataset = SiameseDataset(dataset, transform=transform)
 
 # Use DataLoader to load data in batches
@@ -32,7 +32,7 @@ loss_fn = ContrastiveLoss()
 
 
 num_epochs = 10
-
+import math
 for epoch in range(num_epochs):
     model.train()  # Set model to training mode
     running_loss = 0.0
@@ -55,23 +55,42 @@ for epoch in range(num_epochs):
         
         running_loss += loss.item()
 
+    
     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(dataloader)}')
 
 
 
-# For testing
-model.eval()  # Set model to evaluation mode
+# Assumes your model is already trained and on the right device
+model.eval()
 
-# Example: Get the embeddings for a new pair
-img1 = Image.open("path_to_new_image1").convert('RGB')
-img2 = Image.open("path_to_new_image2").convert('RGB')
-
-img1 = transform(img1).unsqueeze(0).to(device)  # Add batch dimension
-img2 = transform(img2).unsqueeze(0).to(device)
+dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+small_dataset = Subset(dataset, range(500))
+embedding_list = []
+label_list = []
 
 with torch.no_grad():
-    output1, output2 = model(img1, img2)
+    for img, label in DataLoader(dataset, batch_size=32):  # use the same transform
+        img = img.to(device)
+        embeddings = model.forward_one(img)  # assuming this returns the 1D feature vector
+        embedding_list.append(embeddings.cpu())
+        label_list.append(label)
 
-# Calculate Euclidean distance between the two embeddings
-distance = torch.sqrt(torch.sum((output1 - output2) ** 2))
-print(f"Euclidean distance: {distance.item()}")
+# Stack into full tensors
+all_embeddings = torch.cat(embedding_list)
+all_labels = torch.cat(label_list)
+
+
+import pickle 
+
+# Save to a file
+with open("embeddings/cifar10_embeddings.pkl", "wb") as f:
+    pickle.dump({
+        "embeddings": all_embeddings,  # torch.Tensor
+        "labels": all_labels           # torch.Tensor
+    }, f)
+
+
+torch.save(model.state_dict(), "model/siamese_model.pth")
+
+
+
