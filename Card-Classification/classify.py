@@ -34,7 +34,8 @@ def find_nearest_neighbors(query_img_tensor, k=1):
 # Define transformations
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-
+correct = 0
+total = 0
 # Get a test images from CIFAR
 for test_img, test_label in test_dataset:
     test_img_tensor = test_img.to(device)
