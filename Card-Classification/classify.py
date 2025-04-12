@@ -3,6 +3,7 @@ import torch
 from model.siamese_resnet import SiameseNetwork
 import torchvision.transforms as transforms
 from torchvision import datasets
+from torch.nn.functional import normalize
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -16,6 +17,7 @@ model.eval()
 with open("embeddings/cifar10_embeddings.pkl", "rb") as f:
     data = pickle.load(f)
     all_embeddings = data["embeddings"]
+    all_embeddings = normalize(all_embeddings, dim=1)
     all_labels = data["labels"]
 
 
@@ -23,7 +25,8 @@ from torch.nn.functional import pairwise_distance
 
 def find_nearest_neighbors(query_img_tensor, k=1):
     query_embedding = model.forward_one(query_img_tensor.unsqueeze(0).to(device)).cpu()
-
+    query_embedding = normalize(query_embedding, dim=1)
+    
     # Compute distances to all enrolled samples
     distances = torch.norm(all_embeddings - query_embedding, dim=1)  # Euclidean
 
