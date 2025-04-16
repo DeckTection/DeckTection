@@ -55,11 +55,9 @@ for epoch in range(num_epochs):
         
         running_loss += loss.item()
         if idx % 100 == 0:
-            emb1 = model(img1)
-            emb2 = model(img2)
             with torch.no_grad():
                 # Check average distance for same/diff class
-                dists = torch.norm(emb1 - emb2, dim=1)
+                dists = torch.norm(output1 - output2, dim=1)
                 same = label == 0
                 diff = label == 1
                 print(f"[Epoch {epoch} | Batch {idx}] Loss: {loss.item():.4f}")
