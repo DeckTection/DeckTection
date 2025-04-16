@@ -37,7 +37,7 @@ for epoch in range(num_epochs):
     model.train()  # Set model to training mode
     running_loss = 0.0
     
-    for img1, img2, label in dataloader:
+    for idx, (img1, img2, label) in enumerate(dataloader):
         img1, img2, label = img1.to(device), img2.to(device), label.to(device)
         
         # Zero the parameter gradients
@@ -54,6 +54,17 @@ for epoch in range(num_epochs):
         optimizer.step()
         
         running_loss += loss.item()
+        if idx % 100 == 0:
+            emb1 = model(img1)
+            emb2 = model(img2)
+            with torch.no_grad():
+                # Check average distance for same/diff class
+                dists = torch.norm(emb1 - emb2, dim=1)
+                same = label == 0
+                diff = label == 1
+                print(f"[Epoch {epoch} | Batch {idx}] Loss: {loss.item():.4f}")
+                print(f"  Avg same-class dist: {dists[same].mean().item():.4f}")
+                print(f"  Avg diff-class dist: {dists[diff].mean().item():.4f}
 
     
     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(dataloader)}')

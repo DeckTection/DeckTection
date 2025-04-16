@@ -64,7 +64,7 @@ class SiameseDataset(Dataset):
 
         if same_class:
             # Select another image from the same class
-            idx = index+1
+            idx = random.randint(0, len(self.dataset) - 1)
             while self.dataset[idx][1] != label1:
                 idx = random.randint(0, len(self.dataset) - 1)
             img2, label2 = self.dataset[idx]
@@ -80,7 +80,7 @@ class SiameseDataset(Dataset):
             img1 = self.transform(img1)
             img2 = self.transform(img2)
         
-        return img1, img2, int(same_class)
+        return img1, img2, int(not same_class)
 
 
 
