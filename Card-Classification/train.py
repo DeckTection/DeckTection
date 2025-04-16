@@ -64,7 +64,7 @@ for epoch in range(num_epochs):
                 diff = label == 1
                 print(f"[Epoch {epoch} | Batch {idx}] Loss: {loss.item():.4f}")
                 print(f"  Avg same-class dist: {dists[same].mean().item():.4f}")
-                print(f"  Avg diff-class dist: {dists[diff].mean().item():.4f}
+                print(f"  Avg diff-class dist: {dists[diff].mean().item():.4f}")
 
     
     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(dataloader)}')
