@@ -23,23 +23,35 @@ def download_image(url):
         print(f"Download failed for {url}: {e}")
     return None, None
 
-def create_card_images_and_csv(csv_path, output_dir="card_images", output_csv="card_info.csv"):
+def create_card_images_and_csv(csv_paths, output_dir="card_images", output_csv="card_info.csv"):
     # Create output directory for card images
     os.makedirs(output_dir, exist_ok=True)
     
-    # Load card data from CSV
+    # Handle both single and multiple CSV files
+    if isinstance(csv_paths, str):
+        csv_paths = [csv_paths]
+    
+    # Load card data from all CSVs
     cards = []
-    with open(csv_path, newline='', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            img_url = row['Image']
-            # Extract image ID from URL (same method as original code)
-            img_id = img_url.split('/')[-1].split('.')[0]
-            cards.append({
-                'img_id': img_id,
-                'product_name': row['Product Name'],
-                'image_url': img_url
-            })
+    for csv_path in csv_paths:
+        try:
+            with open(csv_path, newline='', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    img_url = row['Image']
+                    # Extract image ID from URL (same method as original code)
+                    img_id = img_url.split('/')[-1].split('.')[0]
+                    cards.append({
+                        'img_id': img_id,
+                        'product_name': row['Product Name'],
+                        'image_url': img_url
+                    })
+        except FileNotFoundError:
+            print(f"Warning: CSV file not found - {csv_path}")
+            continue
+        except Exception as e:
+            print(f"Error processing {csv_path}: {e}")
+            continue
     
     # Process each card to download and save image
     for card in cards:
@@ -101,5 +113,20 @@ def create_card_images_and_csv(csv_path, output_dir="card_images", output_csv="c
     print(f"Metadata CSV saved to: {os.path.abspath(output_csv)}")
 
 if __name__ == "__main__":
-    create_card_images_and_csv(r"$magic-{table}_202504101030.csv")
+    # Example usage patterns:
+    
+    # Single CSV file
+    # create_card_images_and_csv(r"$magic-{table}_202504101030.csv")
+    
+    # Multiple CSV files
+    create_card_images_and_csv([
+        r"$magic-{table}_202504101030.csv",
+        r"$Pokemon-{table}_202504112100.csv",
+        r"$YuGiOh-{table}_202504112056.csv"
+    ])
+    
+    # Or using glob pattern
+    # import glob
+    # create_card_images_and_csv(glob.glob("csv_files/*.csv"))
+    
     print("Process completed!")

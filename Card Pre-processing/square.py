@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-def normalize_to_square(image_path, output_size=512):
+def normalize_to_square(image_path, output_size=640):
     # Read image in color
     color_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
     if color_img is None:
