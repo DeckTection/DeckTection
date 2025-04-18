@@ -3,7 +3,7 @@ import random
 import csv
 import requests
 import glob
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 from io import BytesIO
 from tqdm import tqdm
 import numpy as np
@@ -42,7 +42,122 @@ def load_cards(csv_path):
             })
     return cards
 
+def apply_glare_effect(image):
+    """Add INTENSE artificial glare with dramatic highlights"""
+    # Only apply glare to 80% of cards (more frequent)
+    if random.random() > 0.8:
+        return image
+    
+    width, height = image.size
+    overlay = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    
+    # DRAMATIC glare parameters
+    intensity = random.uniform(0.5, 1.2)  # Much stronger intensity range
+    cx = random.uniform(-0.1 * width, 1.1 * width)  # More centered
+    cy = random.uniform(-0.1 * height, 1.1 * height)
+    radius = random.randint(int(min(width, height)*0.3), int(min(width, height)*1.2))  # Larger radius
+    
+    # Create MULTIPLE glare spots (30% chance)
+    if random.random() < 0.3:
+        for _ in range(random.randint(1, 3)):
+            sub_intensity = random.uniform(0.3, 0.8)
+            sub_cx = cx + random.uniform(-0.2*width, 0.2*width)
+            sub_cy = cy + random.uniform(-0.2*height, 0.2*height)
+            sub_radius = random.randint(int(radius*0.3), int(radius*0.7))
+            
+            for i in range(sub_radius, 0, -1):
+                alpha = int(255 * sub_intensity * (i/sub_radius)**0.3)  # Sharper falloff
+                color = (255, 255, 255, alpha)
+                draw.ellipse(
+                    (sub_cx - i, sub_cy - i, sub_cx + i, sub_cy + i),
+                    fill=color
+                )
+    
+    # Main glare spot (always present)
+    for i in range(radius, 0, -1):
+        alpha = int(255 * intensity * (i/radius)**0.2)  # Very slow falloff for intense core
+        color = random.choice([
+            (255, 255, 255, alpha),  # Bright white
+            (255, 240, 150, alpha),  # Warm golden
+            (180, 220, 255, alpha)   # Cool blue
+        ])
+        draw.ellipse(
+            (cx - i, cy - i, cx + i, cy + i),
+            fill=color
+        )
+    
+    # Apply blur - less blur for sharper glare
+    overlay = overlay.filter(ImageFilter.GaussianBlur(radius=max(1, radius//6)))
+    
+    # Blend modes for more intense effect
+    if random.random() < 0.5:  # 50% chance for additive blending
+        return Image.blend(image, overlay, 0.7)
+    else:
+        return Image.alpha_composite(image, overlay)
+
+def apply_hue_shift(image):
+    """Apply random hue shift to card pixels only"""
+    if random.random() > 0.6:  # 40% chance to apply hue shift
+        return image
+
+    img_array = np.array(image)
+    rgb = img_array[..., :3]
+    alpha = img_array[..., 3] if img_array.shape[2] == 4 else None
+
+    # Create mask of opaque pixels
+    mask = (alpha > 0) if alpha is not None else np.ones(rgb.shape[:2], bool)
+
+    # Convert to HSV (uint8 format)
+    hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+    h, s, v = cv2.split(hsv)
+
+    # Apply hue shift only to masked pixels
+    hue_shift = random.randint(-15, 15)
+    h_float = h.astype(np.float32)
+    h_float[mask] = (h_float[mask] + hue_shift) % 180.0
+    h = np.clip(h_float, 0, 179).astype(np.uint8)
+
+    # Apply saturation adjustment to same pixels
+    if random.random() < 0.3:
+        sat_shift = random.uniform(0.7, 1.3)
+        s_float = s.astype(np.float32)
+        s_float[mask] = np.clip(s_float[mask] * sat_shift, 0, 255)
+        s = s_float.astype(np.uint8)
+
+    # Merge channels
+    hsv_shifted = cv2.merge((h, s, v))
+    rgb_shifted = cv2.cvtColor(hsv_shifted, cv2.COLOR_HSV2RGB)
+
+    # Reconstruct image
+    if alpha is not None:
+        return Image.fromarray(np.dstack((rgb_shifted, alpha)), 'RGBA')
+    return Image.fromarray(rgb_shifted, 'RGB')
+
+def apply_lighting_effects(image):
+    """Apply brightness/contrast adjustments"""
+    if random.random() > 0.5:  # 50% chance to apply
+        return image
+    
+    # Random brightness adjustment
+    brightness = random.uniform(0.8, 1.2)
+    enhancer = ImageEnhance.Brightness(image)
+    image = enhancer.enhance(brightness)
+    
+    # Random contrast adjustment
+    if random.random() < 0.3:
+        contrast = random.uniform(0.9, 1.5)
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(contrast)
+    
+    return image
+
 def process_card_image(card_image):
+    # Apply all visual effects first
+    card_image = apply_glare_effect(card_image)
+    card_image = apply_hue_shift(card_image)
+    card_image = apply_lighting_effects(card_image)
+
     original_width, original_height = card_image.size
     
     # Apply rotation
@@ -55,13 +170,13 @@ def process_card_image(card_image):
     new_height = int(rotated.height * scale_factor)
     resized = rotated.resize((new_width, new_height), Image.LANCZOS)
     
-    # Create a larger canvas to contain the transformed card without cropping
-    padding = int(max(new_width, new_height) * 0.3)  # Extra space for transformation
+    # Create canvas for perspective transform
+    padding = int(max(new_width, new_height) * 0.3)
     canvas_size = (new_width + padding*2, new_height + padding*2)
     canvas = Image.new('RGBA', canvas_size, (0, 0, 0, 0))
     canvas.paste(resized, (padding, padding))
     
-    # Apply perspective transform
+    # Perspective transform points
     src_points = np.array([
         [padding, padding],
         [padding + new_width, padding],
@@ -116,7 +231,7 @@ def process_card_image(card_image):
     except Exception:
         transformed = canvas
     
-    # Get bounding box of non-transparent pixels
+    # Crop to visible area
     bbox = transformed.getbbox()
     if bbox:
         transformed = transformed.crop(bbox)
