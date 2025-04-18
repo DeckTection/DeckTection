@@ -61,5 +61,5 @@ The model compares a new card to reference embeddings and returns the closest ma
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/your_username/DeckTection.git
+   git clone https://github.com/DeckTection/DeckTection.git
    cd DeckTection
