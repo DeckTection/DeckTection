@@ -1,11 +1,7 @@
 import cv2
 import numpy as np
 
-def normalize_to_square(image_path, output_size=512):
-    # Read image in color
-    color_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    if color_img is None:
-        raise ValueError("Image not found or invalid image path")
+def normalize_to_square(color_img, output_size=640):
     
     # Convert to grayscale for processing
     gray_img = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
@@ -93,11 +89,14 @@ def normalize_to_square(image_path, output_size=512):
         matrix,
         (output_size, output_size),
         borderMode=cv2.BORDER_CONSTANT,
-        borderValue=(0, 0, 0)
+        borderValue=(0, 0, 0),
+        flags=cv2.INTER_LANCZOS4
     )
-    
-    return warped
 
-# Usage
-normalized = normalize_to_square(r"card_1_0.0_0.97.jpg")
-cv2.imwrite("normalized_card.jpg", normalized)
+    # Apply Gaussian blur
+    blurred = cv2.GaussianBlur(warped, (0, 0), sigmaX=10)
+
+    # Unsharp mask: original + weighted difference
+    sharp = cv2.addWeighted(warped, 1.5, blurred, -0.5, 0)
+
+    return sharp
