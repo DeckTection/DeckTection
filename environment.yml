@@ -1,0 +1,17 @@
+name: decktection
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.12  # Latest Python version available
+  - pytorch  # Latest version of PyTorch (without specifying a version)
+  - torchvision  # Latest version of torchvision
+  - torchaudio  # Latest version of torchaudio
+  - cudatoolkit=11.3  # Use only if you have GPU support (or omit if not using GPU)
+  - pip
+  - pip:
+    - numpy  # Latest version of numpy
+    - matplotlib  # Latest version of matplotlib
+    - pillow  # Latest version of pillow
+    - scikit-learn  # Latest version of scikit-learn
+    - tqdm  # Latest version of tqdm
