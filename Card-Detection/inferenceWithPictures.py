@@ -1,3 +1,4 @@
+import os
 import cv2
 import torch
 import numpy as np
@@ -5,7 +6,13 @@ from ultralytics import YOLO
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 
-def process_image(image_path, output_path='output.jpg'):
+def process_image(image_path, output_path='images/output.jpg'):
+    # Create output directories if they don't exist
+    os.makedirs('images', exist_ok=True)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     # Load YOLO model
     model = YOLO('runs/detect/train2/weights/best.pt')  # Update path
     
@@ -119,7 +126,7 @@ def process_image(image_path, output_path='output.jpg'):
             resized_square = cv2.resize(padded_original, (224, 224))
 
             # Save the normalized square image
-            card_output_path = f'card_{idx}_{cls}_{conf:.2f}.jpg'
+            card_output_path = os.path.join('images', f'card_{idx}_{cls}_{conf:.2f}.jpg')
             cv2.imwrite(card_output_path, cv2.cvtColor(resized_square, cv2.COLOR_RGB2BGR))
             
             # Apply color overlay for visualization
@@ -143,4 +150,4 @@ def process_image(image_path, output_path='output.jpg'):
 if __name__ == '__main__':
     # Example usage
     input_image = r'mtg_cards_for_final_project.jpg'  # Update with your image path
-    process_image(input_image, 'output_image.jpg')
+    process_image(input_image, 'images/output_image.jpg')
