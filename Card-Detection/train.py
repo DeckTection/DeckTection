@@ -11,7 +11,7 @@ def train_yolov12():
     # Train with augmentation
     results = model.train(
         data=r"C:\Users\willi\Documents\datasets\CardDataset\data.yaml",
-        epochs=5,
+        epochs=300,
         batch=-1,  # Automatic batch size
         imgsz=640,
         device=device,
