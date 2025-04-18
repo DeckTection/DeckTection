@@ -5,6 +5,7 @@ from utils.extract_corners import extract_card_corners
 
 # Dummy test
 if __name__ == "__main__":
+    image_path = "../Card-Detection/card_1_0.0_0.97"
     image_path = "sample_card.jpg"
     image = cv2.imread(image_path)
 
