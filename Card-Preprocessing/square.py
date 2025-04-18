@@ -2,16 +2,16 @@ import cv2
 import numpy as np
 
 def normalize_to_square(image_path, output_size=512):
-    # Read image as grayscale (assuming mask is 0-255)
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    if img is None:
+    # Read image in color
+    color_img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    if color_img is None:
         raise ValueError("Image not found or invalid image path")
     
-    # Convert to BGR for compatibility with drawing functions
-    img_display = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    # Convert to grayscale for processing
+    gray_img = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
     
     # Threshold (assuming mask is 0 and 255)
-    _, thresh = cv2.threshold(img, 1, 255, cv2.THRESH_BINARY)
+    _, thresh = cv2.threshold(gray_img, 1, 255, cv2.THRESH_BINARY)
     
     # Find contours (using RETR_EXTERNAL for outermost contour)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -19,7 +19,7 @@ def normalize_to_square(image_path, output_size=512):
         raise ValueError("No contours found")
     
     # Filter contours by area (remove small noise)
-    min_contour_area = img.size * 0.01  # 1% of total pixels
+    min_contour_area = gray_img.size * 0.01  # 1% of total pixels
     valid_contours = [c for c in contours if cv2.contourArea(c) > min_contour_area]
     if not valid_contours:
         raise ValueError("No valid contours found")
@@ -89,7 +89,7 @@ def normalize_to_square(image_path, output_size=512):
     
     # Perform the warp using the original color image
     warped = cv2.warpPerspective(
-        cv2.cvtColor(img, cv2.COLOR_GRAY2BGR),  # Use color image for warping
+        color_img,  # Warp the color image
         matrix,
         (output_size, output_size),
         borderMode=cv2.BORDER_CONSTANT,
@@ -99,5 +99,5 @@ def normalize_to_square(image_path, output_size=512):
     return warped
 
 # Usage
-normalized = normalize_to_square(r"C:\Users\willi\Documents\GitHub\DeckTection\Card Pre-processing\card_4_0.0_0.94.jpg")
+normalized = normalize_to_square(r"card_1_0.0_0.97.jpg")
 cv2.imwrite("normalized_card.jpg", normalized)
