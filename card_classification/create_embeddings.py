@@ -30,7 +30,8 @@ dataset = CardImageDataset(csv_path="../data_generator/card_info.csv", image_dir
 
 # Instantiate model and optimizer
 model = SiameseNetwork().to(device)
-torch.load(model.state_dict(), "model/siamese_model.pth")
+model.load_state_dict(torch.load("model/siamese_model.pth"))
+
 
 # Assumes your model is already trained and on the right device
 model.eval()
