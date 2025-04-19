@@ -80,36 +80,6 @@ for epoch in range(num_epochs):
 
 
 
-# Assumes your model is already trained and on the right device
-model.eval()
-
-dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
-small_dataset = Subset(dataset, range(500))
-embedding_list = []
-label_list = []
-
-with torch.no_grad():
-    for img, label in DataLoader(dataset, batch_size=128):  # use the same transform
-        img = img.to(device)
-        embeddings = model.forward_one(img)  # assuming this returns the 1D feature vector
-        embedding_list.append(embeddings.cpu())
-        label_list.append(label)
-
-# Stack into full tensors
-all_embeddings = torch.cat(embedding_list)
-all_labels = torch.cat(label_list)
-
-
-import pickle 
-
-# Save to a file
-with open("embeddings/cifar10_embeddings.pkl", "wb") as f:
-    pickle.dump({
-        "embeddings": all_embeddings,  # torch.Tensor
-        "labels": all_labels           # torch.Tensor
-    }, f)
-
-
 torch.save(model.state_dict(), "model/siamese_model.pth")
 
 
