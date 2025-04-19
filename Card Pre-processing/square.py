@@ -53,36 +53,13 @@ def normalize_to_square(image_path, output_size=640):
     
     ordered = order_points(approx)
     
-    # Calculate destination points with padding
-    width = int(max(
-        np.linalg.norm(ordered[0] - ordered[1]),
-        np.linalg.norm(ordered[2] - ordered[3])
-    ))
-    height = int(max(
-        np.linalg.norm(ordered[1] - ordered[2]),
-        np.linalg.norm(ordered[3] - ordered[0])
-    ))
-    
-    # Ensure valid dimensions
-    width = max(width, 1)
-    height = max(height, 1)
-    
-    # Create destination points with aspect ratio preservation
-    scale = min(output_size/width, output_size/height)
-    new_width = int(width * scale)
-    new_height = int(height * scale)
-    
+    # Directly map to full output size without preserving aspect ratio
     dst = np.array([
         [0, 0],
-        [new_width-1, 0],
-        [new_width-1, new_height-1],
-        [0, new_height-1]
+        [output_size-1, 0],
+        [output_size-1, output_size-1],
+        [0, output_size-1]
     ], dtype=np.float32)
-    
-    # Center in output
-    x_offset = (output_size - new_width) // 2
-    y_offset = (output_size - new_height) // 2
-    dst += np.array([[x_offset, y_offset]], dtype=np.float32)
     
     # Calculate perspective transform
     matrix = cv2.getPerspectiveTransform(ordered, dst)

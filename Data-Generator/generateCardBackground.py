@@ -12,7 +12,7 @@ import base64
 import cv2 
 
 # Configuration
-NUM_COMPOSITES = 1000
+NUM_COMPOSITES = 3000
 IMAGE_SIZE = 640
 OUTPUT_DIR = "datasets"
 BACKGROUNDS_DIR = "backgrounds"
@@ -267,6 +267,8 @@ def generate_composite(composite_id, cards, backgrounds):
     num_cards = random.randint(MIN_CARDS, MAX_CARDS)
     selected_cards = random.sample(cards, num_cards)
 
+    # Process all selected cards to get transformed images and sizes
+    processed_cards = []
     for card in selected_cards:
         img = download_image(card['image_url']) or fetch_google_image(card['product_name'])
         if not img:
@@ -277,49 +279,60 @@ def generate_composite(composite_id, cards, backgrounds):
             transformed = process_card_image(img)
             if not transformed:
                 continue
-                
+
             tw, th = transformed.size
-            
+
+            # Check if the transformed card fits in the image
             max_x = IMAGE_SIZE - tw
             max_y = IMAGE_SIZE - th
             if max_x < 0 or max_y < 0:
                 continue
 
-            max_attempts = 10
-            placed = False
-            for _ in range(max_attempts):
-                x = random.randint(0, max_x)
-                y = random.randint(0, max_y)
-                new_bbox = (x, y, x + tw, y + th)
-                
-                complete_overlap = False
-                for existing_bbox in annotations:
-                    inside_existing = (new_bbox[0] >= existing_bbox[0] and
-                                      new_bbox[1] >= existing_bbox[1] and
-                                      new_bbox[2] <= existing_bbox[2] and
-                                      new_bbox[3] <= existing_bbox[3])
-                    existing_inside_new = (existing_bbox[0] >= new_bbox[0] and
-                                          existing_bbox[1] >= new_bbox[1] and
-                                          existing_bbox[2] <= new_bbox[2] and
-                                          existing_bbox[3] <= new_bbox[3])
-                    
-                    if inside_existing or existing_inside_new:
-                        complete_overlap = True
-                        break
-                
-                if not complete_overlap:
-                    placed = True
-                    break
-
-            if not placed:
-                continue
-            
-            bbox = new_bbox
-            bg.paste(transformed, (x, y), transformed)
-            annotations.append(bbox)
+            processed_cards.append((transformed, tw, th))
 
         except Exception as e:
             print(f"Error processing card: {e}")
+            continue
+
+    # Sort processed cards by area in descending order (largest first)
+    processed_cards.sort(key=lambda x: x[1] * x[2], reverse=True)
+
+    # Now attempt to place each card in sorted order
+    for transformed, tw, th in processed_cards:
+        max_x = IMAGE_SIZE - tw
+        max_y = IMAGE_SIZE - th
+
+        max_attempts = 50  # Increased from 10 to 50 for more placement attempts
+        placed = False
+        for _ in range(max_attempts):
+            x = random.randint(0, max_x)
+            y = random.randint(0, max_y)
+            new_bbox = (x, y, x + tw, y + th)
+
+            # Check for complete overlap with existing annotations
+            complete_overlap = False
+            for existing_bbox in annotations:
+                # Check if new_bbox is completely inside existing_bbox
+                inside_existing = (new_bbox[0] >= existing_bbox[0] and
+                                   new_bbox[1] >= existing_bbox[1] and
+                                   new_bbox[2] <= existing_bbox[2] and
+                                   new_bbox[3] <= existing_bbox[3])
+                # Check if existing_bbox is completely inside new_bbox
+                existing_inside_new = (existing_bbox[0] >= new_bbox[0] and
+                                       existing_bbox[1] >= new_bbox[1] and
+                                       existing_bbox[2] <= new_bbox[2] and
+                                       existing_bbox[3] <= new_bbox[3])
+                if inside_existing or existing_inside_new:
+                    complete_overlap = True
+                    break
+
+            if not complete_overlap:
+                placed = True
+                break
+
+        if placed:
+            bg.paste(transformed, (x, y), transformed)
+            annotations.append(new_bbox)
 
     if annotations:
         bg.convert('RGB').save(f"{OUTPUT_DIR}/yolo/images/train/{composite_id}.jpg")
@@ -342,6 +355,7 @@ def generate_composite(composite_id, cards, backgrounds):
                     continue
                 
                 f.write(f"0 {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n")
+
 
 def load_backgrounds():
     backgrounds = []
