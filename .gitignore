@@ -7,3 +7,4 @@ Card-Classification/data/cifar-10-batches-py/readme.html
 /data_generator/card_images
 *.pyc
 /card_classification/data
+/test_images

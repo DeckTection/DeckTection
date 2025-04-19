@@ -40,6 +40,10 @@ model.eval()
 embedding_list = []
 label_list = []
 
+from sklearn.preprocessing import LabelEncoder
+encoder = LabelEncoder()
+
+
 with torch.no_grad():
     for img, label in DataLoader(dataset, batch_size=32):  # use the same transform
         img = img.to(device)
@@ -49,14 +53,18 @@ with torch.no_grad():
 
 # Stack into full tensors
 all_embeddings = torch.cat(embedding_list)
-all_labels = torch.cat(label_list)
-
+# Flatten your nested tuple list
+flat_labels = [label for group in label_list for label in group]
+# Encode to integers
+encoder = LabelEncoder()
+encoded = encoder.fit_transform(flat_labels)
+# Convert to tensor
+all_labels = torch.tensor(encoded)
 
 import pickle 
 
-# Save to a file
 with open("embeddings/cifar10_embeddings.pkl", "wb") as f:
     pickle.dump({
-        "embeddings": all_embeddings,  # torch.Tensor
-        "labels": all_labels           # torch.Tensor
+        "embeddings": all_embeddings,
+        "labels": flat_labels  # labels
     }, f)
