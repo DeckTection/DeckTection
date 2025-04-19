@@ -24,7 +24,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Example of applying the CardImageDataset and transformation
 transform = transforms.Compose([
-    transforms.Resize((640, 640)),  # Resize to 32x32 like CIFAR-10
+    transforms.Resize((128, 128)),  # Resize to 32x32 like CIFAR-10
     transforms.ToTensor(),        # Convert the image to a tensor
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize like CIFAR-10
 ])
@@ -34,7 +34,7 @@ dataset = CardImageDataset(csv_path="../data_generator/card_info.csv", image_dir
 siamese_dataset = SiameseDataset(dataset)
 
 # Use DataLoader to load data in batches
-dataloader = DataLoader(siamese_dataset, batch_size=128, shuffle=True)
+dataloader = DataLoader(siamese_dataset, batch_size=32, shuffle=True)
 
 # Instantiate model and optimizer
 model = SiameseNetwork().to(device)
