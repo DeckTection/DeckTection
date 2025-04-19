@@ -75,12 +75,12 @@ for epoch in range(num_epochs):
                 print(f"  Avg same-class dist: {dists[same].mean().item():.4f}")
                 print(f"  Avg diff-class dist: {dists[diff].mean().item():.4f}")
 
-    
+    torch.save(model.state_dict(), "model/siamese_model.pth")
     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(dataloader)}')
 
 
 
-torch.save(model.state_dict(), "model/siamese_model.pth")
+
 
 
 
