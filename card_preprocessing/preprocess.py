@@ -1,7 +1,35 @@
 import cv2
 import numpy as np
-from utils.square import normalize_to_square
-from utils.clahe_utils import apply_clahe
+import os
+import sys
+from PIL import Image
+
+# Add the root of your project to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from card_preprocessing.preprocess_utils.square import normalize_to_square
+from card_preprocessing.preprocess_utils.clahe_utils import apply_clahe
+
+
+# Dummy test
+def preprocess(original_image):
+    
+    np_img = np.array(original_image)
+
+    # Normalize to square
+    normalized = normalize_to_square(np_img)
+
+    # Apply CLAHE
+    clahe_image = apply_clahe(normalized)
+    
+    return Image.fromarray(clahe_image)
+
+
+
+
+
+
+
+
 
 # Dummy test
 if __name__ == "__main__":

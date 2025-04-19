@@ -52,11 +52,23 @@ class SiameseDataset(Dataset):
     def __init__(self, dataset, transform=None):
         self.dataset = dataset
         self.transform = transform
+        self.class_to_idx = self._get_class_to_idx()
+
 
     def __len__(self):
         return len(self.dataset)
+    
+    def _get_class_to_idx(self):
+        """Helper method to map classes to indices."""
+        class_to_idx = {}
+        for idx, (_, label) in enumerate(self.dataset):
+            if label not in class_to_idx:
+                class_to_idx[label] = []
+            class_to_idx[label].append(idx)
+        return class_to_idx
 
     def __getitem__(self, index):
+
         img1, label1 = self.dataset[index]
         
         # Find a random image that is either of the same class (positive) or different class (negative)
@@ -64,10 +76,13 @@ class SiameseDataset(Dataset):
 
         if same_class:
             # Select another image from the same class
-            idx = random.randint(0, len(self.dataset) - 1)
-            while self.dataset[idx][1] != label1:
-                idx = random.randint(0, len(self.dataset) - 1)
-            img2, label2 = self.dataset[idx]
+            same_class_idxs = self.class_to_idx.get(label1, [])
+            if len(same_class_idxs) > 1:
+                idx = random.choice(same_class_idxs)
+                img2, label2 = self.dataset[idx]
+            else:
+                # If only one image of this class, reuse the same image (to avoid index error)
+                img2, label2 = img1, label1
         else:
             # Select a random image from a different class
             idx = index

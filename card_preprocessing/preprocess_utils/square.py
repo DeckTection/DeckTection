@@ -1,8 +1,14 @@
 import cv2
 import numpy as np
 
-def normalize_to_square(color_img, output_size=640):
+def normalize_to_square(color_img, output_size=None):
     
+    if output_size is None:
+        output_size_h = color_img.shape[0]
+        output_size_w = color_img.shape[1]
+    else:
+        output_size_h = output_size
+        output_size_w = output_size
     # Convert to grayscale for processing
     gray_img = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
     
@@ -64,7 +70,7 @@ def normalize_to_square(color_img, output_size=640):
     height = max(height, 1)
     
     # Create destination points with aspect ratio preservation
-    scale = min(output_size/width, output_size/height)
+    scale = min(output_size_w/width, output_size_h/height)
     new_width = int(width * scale)
     new_height = int(height * scale)
     
@@ -76,8 +82,8 @@ def normalize_to_square(color_img, output_size=640):
     ], dtype=np.float32)
     
     # Center in output
-    x_offset = (output_size - new_width) // 2
-    y_offset = (output_size - new_height) // 2
+    x_offset = (output_size_w - new_width) // 2
+    y_offset = (output_size_h - new_height) // 2
     dst += np.array([[x_offset, y_offset]], dtype=np.float32)
     
     # Calculate perspective transform
@@ -87,16 +93,14 @@ def normalize_to_square(color_img, output_size=640):
     warped = cv2.warpPerspective(
         color_img,  # Warp the color image
         matrix,
-        (output_size, output_size),
+        (output_size_w, output_size_h),
         borderMode=cv2.BORDER_CONSTANT,
         borderValue=(0, 0, 0),
         flags=cv2.INTER_LANCZOS4
     )
 
     # Apply Gaussian blur
-    blurred = cv2.GaussianBlur(warped, (0, 0), sigmaX=10)
-
-    # Unsharp mask: original + weighted difference
-    sharp = cv2.addWeighted(warped, 1.5, blurred, -0.5, 0)
+    blurred = cv2.GaussianBlur(warped, (3, 3), sigmaX=1.5)
+    sharp = cv2.addWeighted(warped, 1.2, blurred, -0.2, 0)
 
     return sharp

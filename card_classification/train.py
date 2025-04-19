@@ -8,19 +8,30 @@ from torchvision import datasets
 from PIL import Image
 import numpy as np
 from model.siamese_resnet import SiameseDataset, SiameseNetwork, ContrastiveLoss
+import pickle
+import sys
+import os
+
+# Add the root of your project to the Python path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Now you can do a normal import
+from utils.cardDatasetUtils import load_card_dataset_pkl, CardImageDataset
+
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Define transformations
-transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+# Example of applying the CardImageDataset and transformation
+transform = transforms.Compose([
+    transforms.Resize((640, 640)),  # Resize to 32x32 like CIFAR-10
+    transforms.ToTensor(),        # Convert the image to a tensor
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize like CIFAR-10
+])
 
-# Load the CIFAR-10 dataset
-dataset = datasets.CIFAR10(root='./data', train=True, download=True)
+dataset = CardImageDataset(csv_path="../data_generator/card_info.csv", image_dir="../card_images", transform=transform)
 
-# Take just the first 500 samples
-small_dataset = Subset(dataset, range(500))
-siamese_dataset = SiameseDataset(dataset, transform=transform)
+siamese_dataset = SiameseDataset(dataset)
 
 # Use DataLoader to load data in batches
 dataloader = DataLoader(siamese_dataset, batch_size=128, shuffle=True)
