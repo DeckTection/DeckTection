@@ -20,7 +20,7 @@ from card_classification.model.siamese_resnet import SiameseNetwork
 from utils.cardDatasetUtils import CardImageDataset
 
 # ------------------- Config -------------------
-EMBEDDING_PATH = "embeddings/cifar10_embeddings.pkl"
+EMBEDDING_PATH = "embeddings/card_embeddings.pkl"
 MODEL_PATH = "model/siamese_model.pth"
 IMAGE_SIZE = 128
 
@@ -58,7 +58,6 @@ def load_card_info(csv_path):
 def classify_top_k_fast(model, image_tensor, all_embeddings, all_labels, k=5):
     """Returns top-k most likely labels and their distances for a given image tensor."""
     with torch.no_grad():
-        image_tensor = transform(image_tensor)
         embedding = model.forward_one(image_tensor.unsqueeze(0).to(device))
         embedding = normalize(embedding, dim=1).cpu()
         
