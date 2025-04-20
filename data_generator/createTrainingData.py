@@ -195,7 +195,7 @@ if __name__ == "__main__":
     # Step 1: Extract top 100 per CSV
     create_card_images_and_csv([
         r"$Pokemon-{table}_202504112100.csv"
-    ], limit=6000)
+    ], limit=1000)
 
     # Step 2: Load the limited cards
     cards = []
