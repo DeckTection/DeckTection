@@ -31,7 +31,7 @@ def load_model(model_path="model/siamese_model.pth"):
     return model
 
 
-def generate_initial_embeddings(dataset_path, image_dir, model_path="model/siamese_model.pth", output_path="embeddings/cifar10_embeddings.pkl", batch_size=32):
+def generate_initial_embeddings(dataset_path, image_dir, model_path="model/siamese_model.pth", output_path="embeddings/cards_embeddings.pkl", batch_size=32):
     dataset = CardImageDataset(csv_path=dataset_path, image_dir=image_dir, transform=transform)
     dataloader = DataLoader(dataset, batch_size=batch_size)
 

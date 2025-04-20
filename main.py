@@ -12,7 +12,7 @@ warnings.filterwarnings("ignore")
 
 # ------------------- Config -------------------
 IMAGE_SIZE = 128
-TOP_K = 3  # Change as needed
+TOP_K = 10  # Change as needed
 MODEL_PATH = "card_classification/model/siamese_model.pth"
 IMAGES_PATH = "card_images"
 IMAGE_DATA_PATH = "data_generator/card_info.csv"
