@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 
 def normalize_to_square(color_img, output_size=640):
-    
     # Convert to grayscale for processing
     gray_img = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
     
@@ -44,12 +43,11 @@ def normalize_to_square(color_img, output_size=640):
         angles = [np.arctan2(p[1]-centroid[1], p[0]-centroid[0]) for p in hull]
         hull = [p for _, p in sorted(zip(angles, hull))]
         
-        # Take the first 4 points (assuming quadrilateral)
         return np.array(hull[:4], dtype=np.float32)
     
     ordered = order_points(approx)
-    
-    # Calculate destination points with padding
+
+    # Calculate dimensions of the card
     width = int(max(
         np.linalg.norm(ordered[0] - ordered[1]),
         np.linalg.norm(ordered[2] - ordered[3])
@@ -62,30 +60,24 @@ def normalize_to_square(color_img, output_size=640):
     # Ensure valid dimensions
     width = max(width, 1)
     height = max(height, 1)
-    
-    # Create destination points with aspect ratio preservation
-    scale = min(output_size/width, output_size/height)
+
+    # Fit to cover the full square (might crop)
+    scale = max(output_size / width, output_size / height)
     new_width = int(width * scale)
     new_height = int(height * scale)
-    
+
+    # Destination points to fill the square
     dst = np.array([
         [0, 0],
-        [new_width-1, 0],
-        [new_width-1, new_height-1],
-        [0, new_height-1]
+        [output_size - 1, 0],
+        [output_size - 1, output_size - 1],
+        [0, output_size - 1]
     ], dtype=np.float32)
-    
-    # Center in output
-    x_offset = (output_size - new_width) // 2
-    y_offset = (output_size - new_height) // 2
-    dst += np.array([[x_offset, y_offset]], dtype=np.float32)
-    
-    # Calculate perspective transform
+
+    # Scale and warp the image to fill the square
     matrix = cv2.getPerspectiveTransform(ordered, dst)
-    
-    # Perform the warp using the original color image
     warped = cv2.warpPerspective(
-        color_img,  # Warp the color image
+        color_img,
         matrix,
         (output_size, output_size),
         borderMode=cv2.BORDER_CONSTANT,
@@ -93,10 +85,8 @@ def normalize_to_square(color_img, output_size=640):
         flags=cv2.INTER_LANCZOS4
     )
 
-    # Apply Gaussian blur
+    # Apply Gaussian blur and sharpening
     blurred = cv2.GaussianBlur(warped, (0, 0), sigmaX=10)
-
-    # Unsharp mask: original + weighted difference
     sharp = cv2.addWeighted(warped, 1.5, blurred, -0.5, 0)
 
     return sharp
