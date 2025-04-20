@@ -40,7 +40,7 @@ def process_image(image_path, output_path='images/output.jpg'):
         os.makedirs(output_dir, exist_ok=True)
 
     # Load YOLO model
-    model = YOLO('runs/detect/train/weights/best.pt')
+    model = YOLO('runs/detect/train2/weights/best.pt')
     
     # Initialize SAM
     sam_checkpoint = "sam2-main/checkpoints/sam2.1_hiera_base_plus.pt"
