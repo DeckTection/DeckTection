@@ -7,6 +7,12 @@ from tqdm import tqdm
 from torchvision import transforms
 from torch.nn.functional import normalize
 from PIL import Image
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import torch
+from torchvision import transforms
+from PIL import Image
+import pandas as pd
 
 # Local imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -15,7 +21,7 @@ from utils.cardDatasetUtils import CardImageDataset
 
 # ------------------- Config -------------------
 EMBEDDING_PATH = "embeddings/cifar10_embeddings.pkl"
-MODEL_PATH = "DeckTection/card_classification/model/siamese_model.pth"
+MODEL_PATH = "model/siamese_model.pth"
 IMAGE_SIZE = 128
 
 # ------------------- Setup -------------------
@@ -41,8 +47,15 @@ def load_embeddings(path=EMBEDDING_PATH):
     labels = np.array(data["labels"])
     return embeddings, labels
 
+# Load card info mapping (label -> id)
+def load_card_info(csv_path):
+    card_info_df = pd.read_csv(csv_path)
+    label_to_id = dict(zip(card_info_df['mantle_sku'], zip(card_info_df['id'], card_info_df['product_name'])))
+    return label_to_id
+
+
 # ------------------- Inference Helpers -------------------
-def classify_top_k(model, image_tensor, all_embeddings, all_labels, k=5):
+def classify_top_k(model, image_tensor, all_embeddings, all_labels, label_to_id, k=5):
     """Returns top-k most likely labels and their distances for a given image tensor."""
     with torch.no_grad():
         image_tensor = transform(image_tensor)
@@ -60,21 +73,13 @@ def classify_top_k(model, image_tensor, all_embeddings, all_labels, k=5):
         # Return both labels and distances
         topk_labels = [all_labels[i] for i in topk_indices]
         topk_distances = [round(d.item(), 3) for d in topk_distances]
+        topk_names = []
 
-        return list(zip(topk_labels, topk_distances))
+        # Plot top-k matches
+        for i in range(k):
+            topk_names.append(label_to_id[topk_labels[i]][1])
 
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-import torch
-from torchvision import transforms
-from PIL import Image
-import pandas as pd
-
-# Load card info mapping (label -> id)
-def load_card_info(csv_path):
-    card_info_df = pd.read_csv(csv_path)
-    label_to_id = dict(zip(card_info_df['mantle_sku'], card_info_df['id']))
-    return label_to_id
+        return list(zip(topk_labels, topk_distances, topk_names))
 
 # Function to classify top-k and plot images
 def classify_top_k_and_plot(model, image_tensor, all_embeddings, all_labels, image_dir, label_to_id, k=3):
@@ -100,7 +105,7 @@ def classify_top_k_and_plot(model, image_tensor, all_embeddings, all_labels, ima
 
         # Plot top-k matches
         for i in range(k):
-            image_id = label_to_id[topk_labels[i]]  # Get the ID for the label
+            image_id = label_to_id[topk_labels[i]][0]  # Get the ID for the label
             
             # Try to load the image as .jpg or .png
             img_path_jpg = f"{image_dir}/{image_id}.jpg"
@@ -153,7 +158,7 @@ if __name__ == "__main__":
     TEST_CSV_PATH = "../data_generator/test_info.csv"
     TEST_IMG_DIR = "../test_images"
     TOP_K = 3
-    NUM_SAMPLES = 100  # Set to None to use full test set
+    NUM_SAMPLES = None  # Set to None to use full test set
 
     # Load everything
     model = load_model()
