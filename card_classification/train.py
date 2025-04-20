@@ -24,14 +24,21 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Example of applying the CardImageDataset and transformation
 transform = transforms.Compose([
-    transforms.Resize((128, 128)),  # Resize to 32x32 like CIFAR-10
-    transforms.ToTensor(),        # Convert the image to a tensor
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize like CIFAR-10
+    transforms.Resize((128, 128)),                # Resize all images to the same size
+    transforms.RandomHorizontalFlip(p=0.5),       # 50% chance to flip image
+    transforms.RandomRotation(degrees=15),        # Slight rotation for robustness
+    transforms.ColorJitter(brightness=0.2, 
+                           contrast=0.2, 
+                           saturation=0.2, 
+                           hue=0.1),              # Random color adjustments
+    transforms.ToTensor(),                        # Convert to tensor
+    transforms.Normalize((0.5, 0.5, 0.5), 
+                         (0.5, 0.5, 0.5))         # Normalize like CIFAR-10
 ])
 
-dataset = CardImageDataset(csv_path="../data_generator/card_info.csv", image_dir="../card_images", transform=transform)
+dataset = CardImageDataset(csv_path="../data_generator/card_info.csv", image_dir="../card_images")#, transform=transform)
 
-siamese_dataset = SiameseDataset(dataset)
+siamese_dataset = SiameseDataset(dataset, transform=transform)
 
 # Use DataLoader to load data in batches
 dataloader = DataLoader(siamese_dataset, batch_size=32, shuffle=True)
@@ -41,7 +48,6 @@ model = SiameseNetwork().to(device)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 loss_fn = ContrastiveLoss()
 
-
 num_epochs = 100
 import math
 for epoch in range(num_epochs):
@@ -49,6 +55,7 @@ for epoch in range(num_epochs):
     running_loss = 0.0
     
     for idx, (img1, img2, label) in enumerate(dataloader):
+
         img1, img2, label = img1.to(device), img2.to(device), label.to(device)
         
         # Zero the parameter gradients
