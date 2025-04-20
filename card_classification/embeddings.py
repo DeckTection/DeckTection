@@ -43,7 +43,6 @@ def generate_initial_embeddings(dataset_path, image_dir, model_path="model/siame
         for img, label in dataloader:
             img = img.to(device)
             embeddings = model.forward_one(img)
-            print(f"Norm of the first embedding: {torch.norm(embeddings[0])}")
             embedding_list.append(embeddings.cpu())
             label_list.extend(label)
     all_embeddings = torch.cat(embedding_list)
