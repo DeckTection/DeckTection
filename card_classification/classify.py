@@ -82,22 +82,9 @@ def classify_top_k(model, image_tensor, all_embeddings, all_labels, label_to_id,
         image_tensor = transform(image_tensor)
         embedding = model.forward_one(image_tensor.unsqueeze(0).to(device))
         embedding = embedding.cpu()
-        # print(f"Norms before normalization: {torch.norm(embedding)}")
-        # embedding = normalize(embedding, dim=1).cpu()
-        # print(f"Norms after normalization: {torch.norm(embedding)}")
         
-        # print(f"Norms before normalization (individual): {torch.norm(all_embeddings, dim=1)}")
-        # # Normalize the embeddings
-        # all_embeddings = normalize(all_embeddings, dim=1).cpu()
-        # print(f"Norms after normalization (individual): {torch.norm(all_embeddings, dim=1)}")
-        
-        import torch.nn.functional as F
-
-        # Cosine similarity
-        cosine_sim = F.cosine_similarity(all_embeddings, embedding, dim=1)
-        distances = 1 - cosine_sim  # Cosine distance
         # Compute distances to all reference embeddings
-        # distances = torch.norm(all_embeddings - embedding, dim=1)
+        distances = torch.norm(all_embeddings - embedding, dim=1)
         
         # Find top-k closest
         topk = torch.topk(distances, k, largest=False)
@@ -107,7 +94,7 @@ def classify_top_k(model, image_tensor, all_embeddings, all_labels, label_to_id,
         # Return both labels and distances
         topk_labels = [all_labels[i] for i in topk_indices]
         
-        topk_distances = [round(d, 10) for d in topk_distances.tolist()]  # Convert tensor to list first
+        topk_distances = [round(d, 10) for d in topk_distances]  # Convert tensor to list first
 
         topk_names = []
 
