@@ -81,7 +81,7 @@ def classify_top_k(model, image_tensor, all_embeddings, all_labels, label_to_id,
     with torch.no_grad():
         image_tensor = transform(image_tensor)
         embedding = model.forward_one(image_tensor.unsqueeze(0).to(device))
-        
+        embedding = embedding.cpu()
         # print(f"Norms before normalization: {torch.norm(embedding)}")
         # embedding = normalize(embedding, dim=1).cpu()
         # print(f"Norms after normalization: {torch.norm(embedding)}")
