@@ -81,8 +81,9 @@ def classify_top_k(model, image_tensor, all_embeddings, all_labels, label_to_id,
     with torch.no_grad():
         image_tensor = transform(image_tensor)
         embedding = model.forward_one(image_tensor.unsqueeze(0).to(device))
-        import pdb;pdb.set_trace()
+        
         embedding = normalize(embedding, dim=1).cpu()
+        all_embeddings = normalize(all_embeddings, dim=1).cpu()
         
         # Compute distances to all reference embeddings
         distances = torch.norm(all_embeddings - embedding, dim=1)
