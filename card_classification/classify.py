@@ -91,8 +91,13 @@ def classify_top_k(model, image_tensor, all_embeddings, all_labels, label_to_id,
         # all_embeddings = normalize(all_embeddings, dim=1).cpu()
         # print(f"Norms after normalization (individual): {torch.norm(all_embeddings, dim=1)}")
         
+        import torch.nn.functional as F
+
+        # Cosine similarity
+        cosine_sim = F.cosine_similarity(all_embeddings, embedding.unsqueeze(0), dim=1)
+        distances = 1 - cosine_sim  # Cosine distance
         # Compute distances to all reference embeddings
-        distances = torch.norm(all_embeddings - embedding, dim=1)
+        # distances = torch.norm(all_embeddings - embedding, dim=1)
         
         # Find top-k closest
         topk = torch.topk(distances, k, largest=False)
