@@ -94,7 +94,7 @@ def classify_top_k(model, image_tensor, all_embeddings, all_labels, label_to_id,
         # Return both labels and distances
         topk_labels = [all_labels[i] for i in topk_indices]
         
-        topk_distances = [round(d, 10) for d in topk_distances.tolist()]  # Convert tensor to list first
+        topk_distances = [round(d, 20) for d in topk_distances.tolist()]  # Convert tensor to list first
 
         topk_names = []
 
