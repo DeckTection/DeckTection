@@ -55,6 +55,28 @@ def load_card_info(csv_path):
 
 
 # ------------------- Inference Helpers -------------------
+def classify_top_k_fast(model, image_tensor, all_embeddings, all_labels, k=5):
+    """Returns top-k most likely labels and their distances for a given image tensor."""
+    with torch.no_grad():
+        image_tensor = transform(image_tensor)
+        embedding = model.forward_one(image_tensor.unsqueeze(0).to(device))
+        embedding = normalize(embedding, dim=1).cpu()
+        
+        # Compute distances to all reference embeddings
+        distances = torch.norm(all_embeddings - embedding, dim=1)
+        
+        # Find top-k closest
+        topk = torch.topk(distances, k, largest=False)
+        topk_indices = topk.indices
+        topk_distances = topk.values
+
+        # Return both labels and distances
+        topk_labels = [all_labels[i] for i in topk_indices]
+
+        return topk_labels
+
+
+
 def classify_top_k(model, image_tensor, all_embeddings, all_labels, label_to_id, k=5):
     """Returns top-k most likely labels and their distances for a given image tensor."""
     with torch.no_grad():
@@ -142,7 +164,7 @@ def evaluate_model_accuracy(model, dataset, all_embeddings, all_labels, k=1, num
         loader = loader[:num_samples]
 
     for img, true_label in tqdm(loader, desc=f"Evaluating Top-{k}"):
-        predicted_labels = classify_top_k(model, img.to(device), all_embeddings, all_labels, k=k)
+        predicted_labels = classify_top_k_fast(model, img.to(device), all_embeddings, all_labels, k=k)
         if true_label in predicted_labels:
             correct += 1
         total += 1
