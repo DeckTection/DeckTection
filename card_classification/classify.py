@@ -180,7 +180,7 @@ if __name__ == "__main__":
 
     TEST_CSV_PATH = "../data_generator/test_info.csv"
     TEST_IMG_DIR = "../test_images"
-    TOP_K = 3
+    TOP_K = 10
     NUM_SAMPLES = None  # Set to None to use full test set
 
     # Load everything
