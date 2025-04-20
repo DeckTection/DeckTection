@@ -8,3 +8,4 @@ Card-Classification/data/cifar-10-batches-py/readme.html
 *.pyc
 /card_classification/data
 /test_images
+/data_generator/datasets/yolo

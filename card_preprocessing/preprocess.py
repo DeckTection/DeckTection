@@ -33,7 +33,7 @@ def preprocess(original_image):
 
 # Dummy test
 if __name__ == "__main__":
-    image_path = "../Card-Detection/card_1_0.0_0.97.jpg"
+    image_path = "../card_detection/card_1_0.0_0.97.jpg"
 
     # Read image in color
     original_image = cv2.imread(image_path, cv2.IMREAD_COLOR)

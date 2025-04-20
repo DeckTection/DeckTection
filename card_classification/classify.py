@@ -2,77 +2,169 @@ import os
 import sys
 import pickle
 import torch
-from torch.nn.functional import normalize, pairwise_distance
-from torchvision import transforms
-from tqdm import tqdm
 import numpy as np
+from tqdm import tqdm
+from torchvision import transforms
+from torch.nn.functional import normalize
+from PIL import Image
 
-# Import local project modules
+# Local imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from model.siamese_resnet import SiameseNetwork
+from card_classification.model.siamese_resnet import SiameseNetwork
 from utils.cardDatasetUtils import CardImageDataset
 
-# ------------------- Configuration -------------------
+# ------------------- Config -------------------
 EMBEDDING_PATH = "embeddings/cifar10_embeddings.pkl"
-MODEL_PATH = "model/siamese_model.pth"
-TEST_CSV_PATH = "../data_generator/test_info.csv"
-TEST_IMG_DIR = "../test_images"
+MODEL_PATH = "DeckTection/card_classification/model/siamese_model.pth"
 IMAGE_SIZE = 128
-TOP_K = 1  # Change to 3, 5, etc. to evaluate top-k accuracy
 
 # ------------------- Setup -------------------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Load trained model
-model = SiameseNetwork()
-model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-model.to(device)
-model.eval()
-
-# Load reference embeddings
-with open(EMBEDDING_PATH, "rb") as f:
-    data = pickle.load(f)
-    all_embeddings = normalize(data["embeddings"], dim=1)
-    all_labels = data["labels"]
-
-# ------------------- Dataset -------------------
 transform = transforms.Compose([
     transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
     transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 ])
 
-test_dataset = CardImageDataset(csv_path=TEST_CSV_PATH, image_dir=TEST_IMG_DIR, transform=transform)
+# ------------------- Load Model & Embeddings -------------------
+def load_model(path=MODEL_PATH):
+    model = SiameseNetwork().to(device)
+    model.load_state_dict(torch.load(path, map_location=device))
+    model.eval()
+    return model
 
-# ------------------- Inference -------------------
-def find_nearest_neighbors(query_img_tensor, k=1):
+def load_embeddings(path=EMBEDDING_PATH):
+    with open(path, "rb") as f:
+        data = pickle.load(f)
+    embeddings = normalize(data["embeddings"], dim=1)
+    labels = np.array(data["labels"])
+    return embeddings, labels
+
+# ------------------- Inference Helpers -------------------
+def classify_top_k(model, image_tensor, all_embeddings, all_labels, k=5):
+    """Returns top-k most likely labels and their distances for a given image tensor."""
     with torch.no_grad():
-        query_embedding = model.forward_one(query_img_tensor.unsqueeze(0).to(device))
-        query_embedding = normalize(query_embedding, dim=1).cpu()
-
-        distances = torch.norm(all_embeddings - query_embedding, dim=1)  # Euclidean
+        image_tensor = transform(image_tensor)
+        embedding = model.forward_one(image_tensor.unsqueeze(0).to(device))
+        embedding = normalize(embedding, dim=1).cpu()
+        
+        # Compute distances to all reference embeddings
+        distances = torch.norm(all_embeddings - embedding, dim=1)
+        
+        # Find top-k closest
         topk = torch.topk(distances, k, largest=False)
-        return topk.indices, all_labels[topk.indices]
+        topk_indices = topk.indices
+        topk_distances = topk.values
 
-def evaluate_model(dataset, k=1):
-    correct = 0
-    total = 0
+        # Return both labels and distances
+        topk_labels = [all_labels[i] for i in topk_indices]
+        topk_distances = [round(d.item(), 3) for d in topk_distances]
 
-    for img, true_label in tqdm(dataset, desc="Evaluating"):
-        indices, predicted_labels = find_nearest_neighbors(img.to(device), k=k)
-        # predicted_labels is likely a NumPy array or list of strings
-        if isinstance(predicted_labels, (list, np.ndarray)):
-            top_k_labels = list(predicted_labels)
-        else:
-            top_k_labels = [predicted_labels]  # force into list
+        return list(zip(topk_labels, topk_distances))
 
-        if true_label in top_k_labels:
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import torch
+from torchvision import transforms
+from PIL import Image
+import pandas as pd
+
+# Load card info mapping (label -> id)
+def load_card_info(csv_path):
+    card_info_df = pd.read_csv(csv_path)
+    label_to_id = dict(zip(card_info_df['mantle_sku'], card_info_df['id']))
+    return label_to_id
+
+# Function to classify top-k and plot images
+def classify_top_k_and_plot(model, image_tensor, all_embeddings, all_labels, image_dir, label_to_id, k=3):
+    """Returns top-k most likely labels and their distances, and plots the test image with top-k matches."""
+    with torch.no_grad():
+        image_tensor = transform(image_tensor)  # Transform input image tensor
+        embedding = model.forward_one(image_tensor.unsqueeze(0).to(device))
+        embedding = normalize(embedding, dim=1).cpu()
+
+        distances = torch.norm(all_embeddings - embedding, dim=1)
+        topk = torch.topk(distances, k, largest=False)
+        topk_indices = topk.indices
+        topk_distances = topk.values
+
+        topk_labels = [all_labels[i] for i in topk_indices]
+        topk_distances = [round(d.item(), 3) for d in topk_distances]
+
+        # Plot the test image
+        fig, axes = plt.subplots(1, k+1, figsize=(15, 5))  # +1 for the test image itself
+        axes[0].imshow(image_tensor.permute(1, 2, 0).cpu())  # Convert tensor to HWC format
+        axes[0].set_title("Test Image")
+        axes[0].axis("off")
+
+        # Plot top-k matches
+        for i in range(k):
+            image_id = label_to_id[topk_labels[i]]  # Get the ID for the label
+            
+            # Try to load the image as .jpg or .png
+            img_path_jpg = f"{image_dir}/{image_id}.jpg"
+            img_path_png = f"{image_dir}/{image_id}.png"
+            
+            # Check which file exists and load it
+            if os.path.exists(img_path_jpg):
+                img_path = img_path_jpg
+            elif os.path.exists(img_path_png):
+                img_path = img_path_png
+            else:
+                print(f"Error: Image {image_id} not found as .jpg or .png.")
+                continue
+
+            img = mpimg.imread(img_path)
+            axes[i+1].imshow(img)
+            axes[i+1].set_title(f"{topk_labels[i]} ({topk_distances[i]})")
+            axes[i+1].axis("off")
+
+        plt.tight_layout()
+        plt.show()
+
+        # Return top-k labels and distances for reference
+        return list(zip(topk_labels, topk_distances))
+
+
+
+def evaluate_model_accuracy(model, dataset, all_embeddings, all_labels, k=1, num_samples=None):
+    """Evaluates top-k accuracy on given dataset."""
+    correct, total = 0, 0
+
+    loader = list(dataset)
+    if num_samples is not None:
+        loader = loader[:num_samples]
+
+    for img, true_label in tqdm(loader, desc=f"Evaluating Top-{k}"):
+        predicted_labels = classify_top_k(model, img.to(device), all_embeddings, all_labels, k=k)
+        if true_label in predicted_labels:
             correct += 1
         total += 1
 
     acc = correct / total
     print(f"\nTop-{k} Accuracy: {acc:.2%} ({correct}/{total})")
+    return acc
 
-# ------------------- Run -------------------
+# ------------------- Example Usage -------------------
 if __name__ == "__main__":
-    evaluate_model(test_dataset, k=TOP_K)
+    from utils.cardDatasetUtils import CardImageDataset
+
+    TEST_CSV_PATH = "../data_generator/test_info.csv"
+    TEST_IMG_DIR = "../test_images"
+    TOP_K = 3
+    NUM_SAMPLES = 100  # Set to None to use full test set
+
+    # Load everything
+    model = load_model()
+    all_embeddings, all_labels = load_embeddings()
+    test_dataset = CardImageDataset(csv_path=TEST_CSV_PATH, image_dir=TEST_IMG_DIR, transform=transform)
+
+    # Run evaluation
+    evaluate_model_accuracy(model, test_dataset, all_embeddings, all_labels, k=TOP_K, num_samples=NUM_SAMPLES)
+
+    # Classify a single image (example)
+    # image = Image.open("path/to/card.jpg").convert("RGB")
+    # image_tensor = transform(image)
+    # top_labels = classify_top_k(model, image_tensor, all_embeddings, all_labels, k=TOP_K)
+    # print("Top-k predictions:", top_labels)
