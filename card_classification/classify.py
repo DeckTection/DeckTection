@@ -59,7 +59,7 @@ def classify_top_k_fast(model, image_tensor, all_embeddings, all_labels, k=5):
     """Returns top-k most likely labels and their distances for a given image tensor."""
     with torch.no_grad():
         embedding = model.forward_one(image_tensor.unsqueeze(0).to(device))
-        embedding = normalize(embedding, dim=1).cpu()
+        embedding = embedding.cpu() 
         
         # Compute distances to all reference embeddings
         distances = torch.norm(all_embeddings - embedding, dim=1)
@@ -110,7 +110,8 @@ def classify_top_k_and_plot(model, image_tensor, all_embeddings, all_labels, ima
     with torch.no_grad():
         image_tensor = transform(image_tensor)  # Transform input image tensor
         embedding = model.forward_one(image_tensor.unsqueeze(0).to(device))
-        embedding = normalize(embedding, dim=1).cpu()
+        # embedding = normalize(embedding, dim=1).cpu()
+        embedding = embedding.cpu()
 
         distances = torch.norm(all_embeddings - embedding, dim=1)
         topk = torch.topk(distances, k, largest=False)
