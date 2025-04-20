@@ -36,9 +36,9 @@ transform = transforms.Compose([
                          (0.5, 0.5, 0.5))         # Normalize like CIFAR-10
 ])
 
-dataset = CardImageDataset(csv_path="../data_generator/card_info.csv", image_dir="../card_images")#, transform=transform)
+dataset = CardImageDataset(csv_path="../data_generator/card_info.csv", image_dir="../card_images", transform=transform)
 
-siamese_dataset = SiameseDataset(dataset, transform=transform)
+siamese_dataset = SiameseDataset(dataset)#, transform=transform)
 
 # Use DataLoader to load data in batches
 dataloader = DataLoader(siamese_dataset, batch_size=32, shuffle=True)
