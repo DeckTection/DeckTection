@@ -5,19 +5,45 @@ import numpy as np
 from ultralytics import YOLO
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
+from scipy import ndimage
+
+def clean_mask(mask):
+    """Post-process mask to remove small artifacts and keep only the main object"""
+    # Keep largest connected component
+    labeled_mask, num_labels = ndimage.label(mask)
+    if num_labels == 0:
+        return mask
+    
+    largest_component = np.zeros_like(mask)
+    max_size = 0
+    for label in range(1, num_labels + 1):
+        component = (labeled_mask == label).astype(np.uint8)
+        size = np.sum(component)
+        if size > max_size:
+            max_size = size
+            largest_component = component
+    
+    # Fill small holes
+    filled_mask = ndimage.binary_fill_holes(largest_component).astype(np.uint8)
+    
+    # Smooth edges
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    smoothed_mask = cv2.morphologyEx(filled_mask, cv2.MORPH_CLOSE, kernel)
+    
+    return smoothed_mask
 
 def process_image(image_path, output_path='images/output.jpg'):
-    # Create output directories if they don't exist
+    # Create output directories
     os.makedirs('images', exist_ok=True)
     output_dir = os.path.dirname(output_path)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
 
     # Load YOLO model
-    model = YOLO('runs/detect/train2/weights/best.pt')  # Update path
+    model = YOLO('runs/detect/train2/weights/best.pt')
     
     # Initialize SAM
-    sam_checkpoint = "sam2-main/checkpoints/sam2.1_hiera_base_plus.pt"  # Update path
+    sam_checkpoint = "sam2-main/checkpoints/sam2.1_hiera_base_plus.pt"
     sam_config = r"C:\Users\willi\Documents\GitHub\DeckTection\Card-Detection\sam2-main\sam2\configs\sam2.1\sam2.1_hiera_b+.yaml"
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     sam_model = build_sam2(sam_config, sam_checkpoint)
@@ -30,10 +56,10 @@ def process_image(image_path, output_path='images/output.jpg'):
         print(f"Error: Could not read image from {image_path}")
         return
     
-    # Convert to RGB for processing
+    # Convert to RGB
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
-    # Run YOLO detection
+    # YOLO detection
     results = model.predict(
         source=frame_rgb,
         conf=0.35,
@@ -42,12 +68,11 @@ def process_image(image_path, output_path='images/output.jpg'):
         show=False
     )
     
-    # Color palette for masks
+    # Color palette
     colors = np.random.randint(0, 255, (1000, 3), dtype=np.uint8)
     
     # Process results
     for result in results:
-        # Make copy of original image
         processed_frame = result.orig_img.copy()
         sam_predictor.set_image(frame_rgb)
         
@@ -55,34 +80,46 @@ def process_image(image_path, output_path='images/output.jpg'):
         classes = result.boxes.cls.cpu().numpy()
         confidences = result.boxes.conf.cpu().numpy()
         
-        # Process each detection
         for idx, (box, cls, conf) in enumerate(zip(boxes, classes, confidences)):
             x1, y1, x2, y2 = map(int, box)
             
-            # Generate center point prompt for SAM
-            center_x = int((x1 + x2) / 2)
-            center_y = int((y1 + y2) / 2)
-            input_point = np.array([[center_x, center_y]])
-            input_label = np.array([1])  # 1 indicates foreground
+            # Generate smart points - center + two diagonal points
+            center = [int((x1 + x2) / 2), int((y1 + y2) / 2)]
+            quarter_w = (x2 - x1) // 4
+            quarter_h = (y2 - y1) // 4
+            fg_points = [
+                center,
+                [x1 + quarter_w, y1 + quarter_h],  # top-left quadrant
+                [x2 - quarter_w, y2 - quarter_h]   # bottom-right quadrant
+            ]
             
-            # Get segmentation mask from SAM
+            # Add one background point outside the box
+            bg_point = [max(0, x1 - 10), center[1]]
+            
+            input_points = np.array(fg_points + [bg_point])
+            input_labels = np.array([1, 1, 1, 0])  # Last point is background
+            
+            # Bounding box prompt
+            sam_box = np.array([x1, y1, x2, y2])
+            
+            # Get mask from SAM
             masks, scores, _ = sam_predictor.predict(
-                point_coords=input_point,
-                point_labels=input_label,
-                multimask_output=False  # Single mask output
+                point_coords=input_points,
+                point_labels=input_labels,
+                box=sam_box,
+                multimask_output=False
             )
             
-            # Process mask
-            mask = masks[0]
-            if isinstance(mask, torch.Tensor):
-                mask = mask.cpu().numpy()
-            mask = (mask > 0.5).astype(np.uint8)
+            # Process mask with higher threshold
+            mask = masks[0].cpu().numpy() if isinstance(masks[0], torch.Tensor) else masks[0]
+            mask = (mask > 0.65).astype(np.uint8)
+            mask = clean_mask(mask)
             
-            # Normalize mask to square
+            # Find mask boundaries
             y_indices, x_indices = np.where(mask == 1)
-            if len(y_indices) == 0 or len(x_indices) == 0:
-                continue  # Skip if no mask found
-            
+            if len(y_indices) == 0:
+                continue
+                
             x_min, x_max = np.min(x_indices), np.max(x_indices)
             y_min, y_max = np.min(y_indices), np.max(y_indices)
             width = x_max - x_min
@@ -115,15 +152,15 @@ def process_image(image_path, output_path='images/output.jpg'):
 
             # Pad the cropped regions
             padded_original = cv2.copyMakeBorder(cropped_original, pad_top, pad_bottom, pad_left, pad_right,
-                                                cv2.BORDER_CONSTANT, value=(0, 0, 0))
+                                               cv2.BORDER_CONSTANT, value=(0, 0, 0))
             padded_mask = cv2.copyMakeBorder(cropped_mask, pad_top, pad_bottom, pad_left, pad_right,
-                                            cv2.BORDER_CONSTANT, value=0)
+                                           cv2.BORDER_CONSTANT, value=0)
 
-            # Apply mask to isolate the card
-            padded_original[padded_mask == 0] = 0
+            # Apply strict masking using bitwise operation
+            masked_card = cv2.bitwise_and(padded_original, padded_original, mask=padded_mask)
 
-            # Resize to standard square size (e.g., 640x640)
-            resized_square = cv2.resize(padded_original, (640, 640))
+            # Resize to standard square size (640x640)
+            resized_square = cv2.resize(masked_card, (640, 640), interpolation=cv2.INTER_NEAREST)
 
             # Save the normalized square image
             card_output_path = os.path.join('images', f'card_{idx}_{cls}_{conf:.2f}.jpg')
@@ -133,12 +170,12 @@ def process_image(image_path, output_path='images/output.jpg'):
             color = colors[int(cls) % 1000].tolist()
             overlay = processed_frame.copy()
             overlay[mask == 1] = color
-            cv2.addWeighted(overlay, 0.3, processed_frame, 0.7, 0, processed_frame)
+            cv2.addWeighted(overlay, 0.5, processed_frame, 0.5, 0, processed_frame)
             
             # Draw bounding box and label
             cv2.rectangle(processed_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             label = f"{result.names[int(cls)]} {conf:.2f}"
-            cv2.putText(processed_frame, label, (x1, y1-10), 
+            cv2.putText(processed_frame, label, (x1, y1 - 10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         
         # Save and display results
@@ -149,5 +186,5 @@ def process_image(image_path, output_path='images/output.jpg'):
 
 if __name__ == '__main__':
     # Example usage
-    input_image = r'mtg_cards_for_final_project.jpg'  # Update with your image path
+    input_image = r'mtg_cards_for_final_project.jpg'
     process_image(input_image, 'images/output_image.jpg')
