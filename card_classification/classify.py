@@ -13,6 +13,8 @@ import torch
 from torchvision import transforms
 from PIL import Image
 import pandas as pd
+import argparse
+
 
 # Local imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -177,12 +179,14 @@ def evaluate_model_accuracy(model, dataset, all_embeddings, all_labels, k=1, num
 
 # ------------------- Example Usage -------------------
 if __name__ == "__main__":
-    from utils.cardDatasetUtils import CardImageDataset
+    parser = argparse.ArgumentParser(description="Evaluate model on test set with top-K accuracy.")
+    parser.add_argument("--top_k", type=int, default=10, help="Value of K for top-K accuracy")
+    parser.add_argument("--num_samples", type=int, default=None, help="Number of test samples to evaluate (default: all)")
+
+    args = parser.parse_args()
 
     TEST_CSV_PATH = "../data_generator/test_info.csv"
     TEST_IMG_DIR = "../test_images"
-    TOP_K = 10
-    NUM_SAMPLES = None  # Set to None to use full test set
 
     # Load everything
     model = load_model()
@@ -190,7 +194,8 @@ if __name__ == "__main__":
     test_dataset = CardImageDataset(csv_path=TEST_CSV_PATH, image_dir=TEST_IMG_DIR, transform=transform)
 
     # Run evaluation
-    evaluate_model_accuracy(model, test_dataset, all_embeddings, all_labels, k=TOP_K, num_samples=NUM_SAMPLES)
+    evaluate_model_accuracy(model, test_dataset, all_embeddings, all_labels,
+                            k=args.top_k, num_samples=args.num_samples)
 
     # Classify a single image (example)
     # image = Image.open("path/to/card.jpg").convert("RGB")
