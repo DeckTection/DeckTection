@@ -57,7 +57,7 @@ def generate_augmented_tests(card_info_csv="card_info.csv", input_dir="../card_i
     card_info = pd.read_csv(card_info_csv)
     image_rows = card_info.to_dict("records")  # ← Convert to list of row dicts
     sampled_rows = [random.choice(image_rows) for _ in range(num_total_tests)]
-    for _, row in tqdm(sampled_rows, total=num_total_tests, desc="Augmenting cards"):
+    for idx, row in tqdm(enumerate(sampled_rows), total=num_total_tests, desc="Augmenting cards"):
         image_path = os.path.join(input_dir, row['image_name'])
 
         try:
