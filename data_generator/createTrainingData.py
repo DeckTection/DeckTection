@@ -190,8 +190,9 @@ def create_card_images_and_csv(csv_paths, output_dir="../card_images", output_cs
                     card_type = row.get('Card Type', '').strip()
                     card_number = row.get('Card Number', '').strip()
                     foil = row.get('Foil', '').strip()
+                    product_name = row.get('Product Name', '').strip()
 
-                    product_name = f"{card_type} {card_number} {foil}".strip()
+                    product_name = f"{product_name} {card_type} {card_number} {foil}".strip()
 
                     mantle_sku = row['Mantle SKU']
                     cards.append({

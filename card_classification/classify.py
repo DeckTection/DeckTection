@@ -102,7 +102,7 @@ def classify_top_k(model, image_tensor, all_embeddings, all_labels, label_to_id,
 
         # Plot top-k matches
         for i in range(k):
-            topk_names.append(label_to_id[topk_labels[i]][1])
+            topk_names.append(label_to_id[topk_labels[i]][0])
 
         return list(zip(topk_labels, topk_distances, topk_names))
 
