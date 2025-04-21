@@ -170,7 +170,7 @@ def process_image(image_path, output_path='images/output.jpg'):
             color = colors[int(cls) % 1000].tolist()
             overlay = processed_frame.copy()
             overlay[mask == 1] = color
-            cv2.addWeighted(overlay, 0.3, processed_frame, 0.7, 0, processed_frame)
+            cv2.addWeighted(overlay, 0.5, processed_frame, 0.5, 0, processed_frame)
             
             # Draw bounding box and label
             cv2.rectangle(processed_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
