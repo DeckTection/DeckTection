@@ -44,7 +44,7 @@ def process_image(image_path, output_path='images/output.jpg'):
     
     # Initialize SAM
     sam_checkpoint = "sam2-main/checkpoints/sam2.1_hiera_base_plus.pt"
-    sam_config = r"C:\Users\willi\Documents\GitHub\DeckTection\Card-Detection\sam2-main\sam2\configs\sam2.1\sam2.1_hiera_b+.yaml"
+    sam_config = r"C:\Users\ardar\Github\DeckTection\card_detection\sam2-main\sam2\configs\sam2.1\sam2.1_hiera_b+.yaml"
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     sam_model = build_sam2(sam_config, sam_checkpoint)
     sam_model.to(device)
