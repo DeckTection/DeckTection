@@ -54,7 +54,7 @@ def generate_augmented_tests(card_info_csv="card_info.csv", input_dir="../card_i
     card_info = pd.read_csv(card_info_csv)
     results = []
 
-    sampled_rows = [random.choice(card_info.iterrows()) for _ in range(num_total_tests)]
+    sampled_rows = [random.choice(card_info) for _ in range(num_total_tests)]
     for _, row in tqdm(sampled_rows, total=num_total_tests, desc="Augmenting cards"):
         image_path = os.path.join(input_dir, row['image_name'])
 
