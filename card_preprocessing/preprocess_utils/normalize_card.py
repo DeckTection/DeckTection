@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-def normalize_to_square(color_img, output_size=None):
+def normalize(color_img, output_size=None):
     if output_size is None:
         output_size_h = color_img.shape[0]
         output_size_w = color_img.shape[1]
@@ -68,7 +68,8 @@ def normalize_to_square(color_img, output_size=None):
     # Ensure valid dimensions
     width = max(width, 1)
     height = max(height, 1)
-    
+    output_size_w = width
+    output_size_h = height
     # Create destination points with aspect ratio preservation
     scale = min(output_size_w/width, output_size_h/height)
     new_width = int(width * scale)

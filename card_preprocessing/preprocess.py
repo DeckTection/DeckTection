@@ -6,7 +6,7 @@ from PIL import Image
 
 # Add the root of your project to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from card_preprocessing.preprocess_utils.square import normalize_to_square
+from card_preprocessing.preprocess_utils.normalize_card import normalize
 from card_preprocessing.preprocess_utils.clahe_utils import apply_clahe
 
 
@@ -15,9 +15,13 @@ def preprocess(original_image):
     
     np_img = np.array(original_image)
 
-    # Normalize to square
-    normalized = normalize_to_square(np_img)
+    print(original_image.shape)
 
+
+    # Normalize to square
+    normalized = normalize(np_img)
+
+    
     # Apply CLAHE
     clahe_image = apply_clahe(normalized)
     
@@ -52,6 +56,9 @@ if __name__ == "__main__":
     
     clahe_image = apply_clahe(normalized)
 
+    print(original_image.shape)
+    print(normalized.shape)
+    print(clahe_image.shape)
     # Resize normalized and CLAHE images to match original's shape
     height, width = original_image.shape[:2]
     normalized_resized = cv2.resize(normalized, (width, height))
