@@ -15,9 +15,6 @@ def preprocess(original_image):
     
     np_img = np.array(original_image)
 
-    print(original_image.shape)
-
-
     # Normalize to square
     normalized = normalize(np_img)
 
