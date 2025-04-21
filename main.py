@@ -29,12 +29,17 @@ def load_image(image_path, csv_path=TEST_CSV):
     image_filename = image_path.split("/")[-1]  # Extract filename from path
     card_id = image_filename  # Get the card id (remove extension)
 
-    # Look up the row in the DataFrame where 'id' matches the image card id
+    # Look up the row in the DataFrame where 'image_name' matches the card ID
     card_info = card_info_df[card_info_df['image_name'] == card_id]
 
-    # Extract additional card info from the DataFrame (e.g., product_name, mantle_sku)
-    mantle_sku = card_info.iloc[0]['mantle_sku']
-    product_name = card_info.iloc[0]['product_name']
+    if not card_info.empty:
+        # Extract values if the row was found
+        mantle_sku = card_info.iloc[0]['mantle_sku']
+        product_name = card_info.iloc[0]['product_name']
+    else:
+        # Fallback if no matching row was found
+        mantle_sku = "unknown"
+        product_name = "unknown"
 
     # Now load the image itself
     image = cv2.imread(image_path)
