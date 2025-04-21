@@ -47,14 +47,15 @@ def augment(image):
 
     return image
 
-def generate_augmented_tests(card_info_csv="card_info.csv", input_dir="../card_images", output_dir="../test_images", output_csv="test_info.csv", num_augments=2):
+def generate_augmented_tests(card_info_csv="card_info.csv", input_dir="../card_images", output_dir="../test_images", output_csv="test_info.csv", num_augments=2, num_total_tests=100):
     os.makedirs(output_dir, exist_ok=True)
     perspective = PerspectiveWarp()
 
     card_info = pd.read_csv(card_info_csv)
     results = []
 
-    for _, row in tqdm(card_info.iterrows(), total=len(card_info), desc="Augmenting cards"):
+    sampled_rows = [random.choice(card_info.iterrows()) for _ in range(num_total_tests)]
+    for _, row in tqdm(sampled_rows, total=num_total_tests, desc="Augmenting cards"):
         image_path = os.path.join(input_dir, row['image_name'])
 
         try:
