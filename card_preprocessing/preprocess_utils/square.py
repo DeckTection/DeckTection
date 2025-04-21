@@ -2,13 +2,13 @@ import cv2
 import numpy as np
 
 def normalize_to_square(color_img, output_size=None):
-    
     if output_size is None:
         output_size_h = color_img.shape[0]
         output_size_w = color_img.shape[1]
     else:
         output_size_h = output_size
         output_size_w = output_size
+
     # Convert to grayscale for processing
     gray_img = cv2.cvtColor(color_img, cv2.COLOR_BGR2GRAY)
     
