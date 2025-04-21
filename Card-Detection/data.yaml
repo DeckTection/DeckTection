@@ -1,9 +1,0 @@
-path: datasets/
-train: yolo/images/train
-val: yolo/images/train  # Should create separate validation set
-test: 
-
-names: 
-  0: playing_card
-
-nc: 1
