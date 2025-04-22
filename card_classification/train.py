@@ -48,6 +48,7 @@ model = SiameseNetwork().to(device)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 loss_fn = ContrastiveLoss()
 
+loss_str = []
 num_epochs = 100
 import math
 for epoch in range(num_epochs):
@@ -72,6 +73,7 @@ for epoch in range(num_epochs):
         optimizer.step()
         
         running_loss += loss.item()
+        loss_str.append(running_loss)
         if idx % 100 == 0:
             with torch.no_grad():
                 # Check average distance for same/diff class
@@ -86,7 +88,10 @@ for epoch in range(num_epochs):
     print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(dataloader)}')
 
 
-
+import csv
+with open("loss_over_epochs.csv", "w", newline="") as file:
+    writer = csv.writer(file)
+    writer.writerow(loss_str) 
 
 
 
