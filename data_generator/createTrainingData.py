@@ -191,10 +191,11 @@ def create_card_images_and_csv(csv_paths, output_dir="../card_images", output_cs
                     card_number = row.get('Card Number', '').strip()
                     foil = row.get('Foil', '').strip()
                     product_name = row.get('Product Name', '').strip()
-
-                    product_name = f"{product_name} {card_type} {card_number} {foil}".strip()
-
                     mantle_sku = row['Mantle SKU']
+
+                    product_name = f"{mantle_sku}_{product_name}_{card_type}_{card_number}_{foil}".strip()
+                    product_name = product_name.replace(" ", "_")
+                    
                     cards.append({
                         'img_id': img_id,
                         'product_name': product_name,

@@ -27,7 +27,7 @@ class CardImageDataset(Dataset):
         self.transform = transform or transforms.ToTensor()  # Default to ToTensor if no transform is passed
         self.image_paths = self.data['image_name'].tolist()
         self.product_names = self.data['product_name'].tolist()
-        self.labels = self.data['mantle_sku'].tolist()  # Mantle SKU as the label
+        self.labels = self.data['product_name'].tolist()  # Mantle SKU as the label
         
         # You can also store the class mappings here for further use, if needed
 

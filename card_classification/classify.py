@@ -52,7 +52,7 @@ def load_embeddings(path=EMBEDDING_PATH):
 # Load card info mapping (label -> id)
 def load_card_info(csv_path):
     card_info_df = pd.read_csv(csv_path)
-    label_to_id = dict(zip(card_info_df['mantle_sku'], zip(card_info_df['id'], card_info_df['product_name'])))
+    label_to_id = dict(zip(card_info_df['product_name'], zip(card_info_df['id'], card_info_df['product_name'])))
     return label_to_id
 
 
