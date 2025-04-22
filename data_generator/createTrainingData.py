@@ -149,7 +149,7 @@ def process_card(card, output_dir, count):
             warped_image = preprocess(perspective_warp(image_resized))
 
             # Save warped image
-            warped_filename = f"{img_id}_warped.{ext}"
+            warped_filename = f"{img_id}_{count}_warped.{ext}"
             warped_save_path = os.path.join(output_dir, warped_filename)
             warped_image.save(warped_save_path, format='PNG')
 
@@ -249,7 +249,7 @@ if __name__ == "__main__":
     # Single CSV with 1000 cards
     create_card_images_and_csv([
         r"$Pokemon-{table}_202504112100.csv"
-    ], limit=1000)
+    ], limit=100)
 
     # Multiple CSVs with 100 cards each
     # create_card_images_and_csv([
