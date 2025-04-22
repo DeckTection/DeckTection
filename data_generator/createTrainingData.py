@@ -113,7 +113,7 @@ def download_image(url):
         print(f"Download failed for {url}: {e}")
     return None, None
 
-def process_card(card, output_dir):
+def process_card(card, output_dir, count):
     img_url = card['image_url']
     img_id = card['img_id']
     product_name = card['product_name']
@@ -137,7 +137,7 @@ def process_card(card, output_dir):
             img_format = detected_format or image.format or 'JPEG'
             ext = 'png'  # Force PNG for consistency
             
-            filename = f"{img_id}.{ext}"
+            filename = f"{img_id}_{count}.{ext}"
             save_path = os.path.join(output_dir, filename)
 
             # Resize and save original
@@ -225,8 +225,12 @@ def create_card_images_and_csv(csv_paths, output_dir="../card_images", output_cs
 
     # Step 3: Process and save images
     results = []
+
     with ThreadPoolExecutor(max_workers=1) as executor:
-        futures = [executor.submit(process_card, card, output_dir) for card in cards]
+        futures = [
+            executor.submit(process_card, card, output_dir, idx)
+            for idx, card in enumerate(cards)
+        ]
         for future in as_completed(futures):
             result = future.result()
             if result:
