@@ -249,7 +249,7 @@ if __name__ == "__main__":
     # Single CSV with 1000 cards
     create_card_images_and_csv([
         r"$Pokemon-{table}_202504112100.csv"
-    ], limit=3000)
+    ], limit=1000)
 
     # Multiple CSVs with 100 cards each
     # create_card_images_and_csv([
