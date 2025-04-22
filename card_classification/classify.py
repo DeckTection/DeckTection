@@ -169,7 +169,6 @@ def evaluate_model_accuracy(model, dataset, all_embeddings, all_labels, k=1, num
 
     for img, true_label in tqdm(loader, desc=f"Evaluating Top-{k}"):
         predicted_labels = classify_top_k_fast(model, img.to(device), all_embeddings, all_labels, k=k)
-        import pdb;pdb.set_trace()
         if true_label in predicted_labels:
             correct += 1
         total += 1

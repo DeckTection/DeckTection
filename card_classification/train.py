@@ -49,7 +49,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 loss_fn = ContrastiveLoss()
 
 loss_str = []
-num_epochs = 100
+num_epochs = 25
 import math
 for epoch in range(num_epochs):
     model.train()  # Set model to training mode
